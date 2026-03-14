@@ -1,0 +1,12 @@
+[package]
+name    = "aegisq-pyo3"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name       = "_aegisq_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3        = { version = "0.28", features = ["extension-module", "abi3-py311"] }
+aegisq-core = { path = "../aegisq-core" }

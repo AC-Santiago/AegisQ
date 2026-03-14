@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.env
+.env.*
+*.env
+
+# Rust
+target/
+**/*.rs.bk
+
+# Maturin build artifacts
+*.so
+*.pyd
+*.dll
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+
+# Lsps cache
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# IA Tools settings
+.opencode/
+opencode.json
+AGENTS.md

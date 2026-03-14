@@ -1,0 +1,34 @@
+[project]
+name = "aegisq"
+version = "0.1.0"
+description = "Post-quantum cryptography engine — Hybrid ML-KEM + AES-256-GCM"
+readme = "README.md"
+authors = [
+    { name = "AC-Santiago", email = "acostasantiago311124578@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.maturin]
+manifest-path = "crates/aegisq-pyo3/Cargo.toml"
+python-source = "."
+module-name   = "aegisq._aegisq_core"
+features      = ["pyo3/extension-module"]
+
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "crates/**/*.rs" },
+    { file = "Cargo.toml" },
+    { file = "Cargo.lock" },
+]
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.8.0",
+]

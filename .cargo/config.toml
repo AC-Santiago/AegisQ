@@ -1,0 +1,6 @@
+# Flags de compilacion globales para AegisQ
+# Optimizaciones de seguridad y rendimiento
+
+[build]
+# Habilitar instrucciones AES-NI en x86_64 para aceleracion por hardware de AES-GCM
+rustflags = ["-C", "target-cpu=native"]
