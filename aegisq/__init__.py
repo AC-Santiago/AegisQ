@@ -23,6 +23,7 @@ Uso basico::
 """
 
 from aegisq._aegisq_core import KeyPair, SecurityLevel
+from aegisq.cipher import AegisCipher
 from aegisq.exceptions import (
     AegisQError,
     DecapsulationError,
@@ -30,7 +31,6 @@ from aegisq.exceptions import (
     InvalidParameterError,
     RngError,
 )
-from aegisq.cipher import AegisCipher
 from aegisq.kem import MlKem
 
 __all__ = [

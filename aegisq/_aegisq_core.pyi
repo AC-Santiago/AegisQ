@@ -4,8 +4,6 @@ Proporciona autocompletado y type checking para IDEs (PyCharm, VS Code)
 y herramientas de analisis estatico (mypy, pyright).
 """
 
-from typing import overload
-
 # --- Excepciones ---
 
 class AegisQError(Exception):

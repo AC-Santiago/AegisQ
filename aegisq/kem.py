@@ -22,11 +22,17 @@ Ejemplo::
 from __future__ import annotations
 
 from aegisq._aegisq_core import (
-    SecurityLevel,
     KeyPair,
-    generate_keypair as _generate_keypair,
-    encapsulate as _encapsulate,
+    SecurityLevel,
+)
+from aegisq._aegisq_core import (
     decapsulate as _decapsulate,
+)
+from aegisq._aegisq_core import (
+    encapsulate as _encapsulate,
+)
+from aegisq._aegisq_core import (
+    generate_keypair as _generate_keypair,
 )
 
 

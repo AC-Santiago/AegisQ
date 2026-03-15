@@ -29,11 +29,11 @@ Ejemplo::
 from __future__ import annotations
 
 from aegisq._aegisq_core import (
-    SecurityLevel,
     KeyPair,
-    generate_keypair,
-    encrypt_hybrid,
+    SecurityLevel,
     decrypt_hybrid,
+    encrypt_hybrid,
+    generate_keypair,
 )
 
 
