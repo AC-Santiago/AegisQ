@@ -232,7 +232,7 @@ mod tests {
     fn test_add_max_values() {
         let a = FieldElement::new(Q - 1); // 3328
         let b = FieldElement::new(Q - 1); // 3328
-                                          // 3328 + 3328 = 6656 → 6656 - 3329 = 3327
+        // 3328 + 3328 = 6656 → 6656 - 3329 = 3327
         assert_eq!(a.add(b).value(), 3327);
     }
 

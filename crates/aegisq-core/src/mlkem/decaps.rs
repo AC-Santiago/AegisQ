@@ -15,7 +15,7 @@ use crate::kem::SecurityLevel;
 use crate::mlkem::encaps::{encode_message, k_pke_encrypt};
 use crate::mlkem::math::compress::decompress_poly;
 use crate::mlkem::math::poly::{Poly, PolyVec};
-use crate::mlkem::params::{params_for_level, MlKemParams, N};
+use crate::mlkem::params::{MlKemParams, N, params_for_level};
 use crate::mlkem::sampling::{hash_g, hash_j};
 use subtle::ConstantTimeEq;
 
