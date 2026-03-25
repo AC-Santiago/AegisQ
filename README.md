@@ -226,7 +226,7 @@ pytest tests/python/test_kem_api.py           # MlKem API
 ```bash
 cargo clippy --workspace -- -D warnings   # Rust linter (warnings are errors)
 cargo fmt --all                           # Rust formatting
-mypy aegisq/ --strict                     # Python type checking
+ruff check aegisq/                        # Python type checking
 ```
 
 ---

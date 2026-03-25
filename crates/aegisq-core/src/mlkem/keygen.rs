@@ -11,7 +11,7 @@
 use crate::error::AegisQError;
 use crate::kem::SecurityLevel;
 use crate::mlkem::math::poly::{Poly, PolyVec};
-use crate::mlkem::params::{MlKemParams, params_for_level};
+use crate::mlkem::params::{params_for_level, MlKemParams};
 use crate::mlkem::sampling::{hash_g, hash_h, sample_noise_poly, sample_ntt};
 use rand_core::{OsRng, RngCore};
 
@@ -184,7 +184,6 @@ fn k_pke_keygen_deterministic(d: &[u8; 32], level: SecurityLevel) -> CpaKeyPair 
 ///
 /// Takes explicit `d` and `z` seeds instead of generating from OsRng.
 /// This is NOT for production use — only for KAT vector validation.
-#[cfg(test)]
 pub(crate) fn ml_kem_keygen_deterministic(
     d: &[u8; 32],
     z: &[u8; 32],

@@ -83,6 +83,52 @@ def decapsulate(
     """Desencapsula el shared secret."""
     ...
 
+def generate_keypair_deterministic(
+    d: bytes,
+    z: bytes,
+    level: SecurityLevel = SecurityLevel.ML_KEM_768,
+) -> KeyPair:
+    """Genera un par de claves ML-KEM usando seeds especificos.
+
+    Version DETERMINISTA para validacion con vectores KAT.
+    NO usar en produccion.
+
+    Args:
+        d: Seed de 32 bytes para generacion de claves K-PKE.
+        z: Seed de 32 bytes para el contenido de la clave secreta.
+        level: Nivel de seguridad.
+
+    Returns:
+        KeyPair con public_key y secret_key.
+
+    Raises:
+        InvalidParameterError: Si los seeds no tienen 32 bytes.
+    """
+    ...
+
+def encapsulate_deterministic(
+    public_key: bytes,
+    m: bytes,
+    level: SecurityLevel = SecurityLevel.ML_KEM_768,
+) -> tuple[bytes, bytes, bytes]:
+    """Encapsula un shared secret usando un mensaje especifico.
+
+    Version DETERMINISTA para validacion con vectores KAT.
+    NO usar en produccion.
+
+    Args:
+        public_key: Clave publica del receptor.
+        m: Mensaje de 32 bytes a encapsular.
+        level: Nivel de seguridad.
+
+    Returns:
+        Tupla (capsule, shared_secret, m).
+
+    Raises:
+        InvalidParameterError: Si los parametros tienen tamano incorrecto.
+    """
+    ...
+
 # --- Funciones hibridas ---
 
 def encrypt_hybrid(

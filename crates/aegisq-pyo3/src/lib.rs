@@ -31,6 +31,16 @@ fn _aegisq_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(kem_bindings::encapsulate, m)?)?;
     m.add_function(wrap_pyfunction!(kem_bindings::decapsulate, m)?)?;
 
+    // Registrar funciones KEM deterministas (para KAT vector validation)
+    m.add_function(wrap_pyfunction!(
+        kem_bindings::generate_keypair_deterministic,
+        m
+    )?)?;
+    m.add_function(wrap_pyfunction!(
+        kem_bindings::encapsulate_deterministic,
+        m
+    )?)?;
+
     // Registrar funciones hibridas
     m.add_function(wrap_pyfunction!(hybrid_bindings::encrypt_hybrid, m)?)?;
     m.add_function(wrap_pyfunction!(hybrid_bindings::decrypt_hybrid, m)?)?;

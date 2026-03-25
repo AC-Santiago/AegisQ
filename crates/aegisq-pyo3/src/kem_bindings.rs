@@ -9,6 +9,28 @@ use pyo3::types::PyBytes;
 use crate::error::core_error_to_pyerr;
 use crate::types::{KeyPair, SecurityLevel};
 
+/// Resultado de encapsulacion determinista.
+#[allow(dead_code)]
+#[derive(Clone)]
+pub struct DeterministicEncapsulationResult {
+    /// Capsula (ciphertext).
+    pub capsule: Vec<u8>,
+    /// Shared secret (32 bytes).
+    pub shared_secret: Vec<u8>,
+    /// Mensaje `m` usado (32 bytes).
+    pub m: [u8; 32],
+}
+
+impl From<aegisq_core::kem::DeterministicEncapsulationResult> for DeterministicEncapsulationResult {
+    fn from(core_result: aegisq_core::kem::DeterministicEncapsulationResult) -> Self {
+        DeterministicEncapsulationResult {
+            capsule: core_result.capsule,
+            shared_secret: core_result.shared_secret,
+            m: core_result.m,
+        }
+    }
+}
+
 /// Genera un par de claves ML-KEM para el nivel de seguridad dado.
 ///
 /// Args:
@@ -88,6 +110,105 @@ pub fn decapsulate<'py>(
 
     match result {
         Ok(shared_secret) => Ok(PyBytes::new(py, &shared_secret)),
+        Err(e) => Err(core_error_to_pyerr(e)),
+    }
+}
+
+// --- Funciones deterministas para KAT vector validation ---
+
+/// Genera un par de claves ML-KEM usando seeds especificos.
+///
+/// Esta version es DETERMINISTA y debe usarse SOLO para validacion
+/// con vectores KAT conocidos. NO usar en produccion.
+///
+/// Args:
+///     d: Seed de 32 bytes para generacion de claves K-PKE.
+///     z: Seed de 32 bytes para el contenido de la clave secreta.
+///     level: Nivel de seguridad.
+///
+/// Returns:
+///     KeyPair con public_key y secret_key.
+///
+/// Raises:
+///     InvalidParameterError: Si los seeds no tienen 32 bytes o el nivel es invalido.
+#[pyfunction]
+#[pyo3(signature = (d, z, level=SecurityLevel::MlKem768))]
+pub fn generate_keypair_deterministic(
+    py: Python<'_>,
+    d: &[u8],
+    z: &[u8],
+    level: SecurityLevel,
+) -> PyResult<KeyPair> {
+    // Validate seed sizes
+    if d.len() != 32 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "El seed 'd' debe tener exactamente 32 bytes",
+        ));
+    }
+    if z.len() != 32 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "El seed 'z' debe tener exactamente 32 bytes",
+        ));
+    }
+
+    let d_array: [u8; 32] = d.try_into().unwrap();
+    let z_array: [u8; 32] = z.try_into().unwrap();
+    let core_level: aegisq_core::kem::SecurityLevel = level.into();
+
+    let result = py.detach(|| {
+        aegisq_core::kem::generate_keypair_deterministic(&d_array, &z_array, core_level)
+    });
+
+    Ok(KeyPair::new(result.public_key, result.secret_key, level))
+}
+
+/// Encapsula un shared secret usando un mensaje especifico.
+///
+/// Esta version es DETERMINISTA y debe usarse SOLO para validacion
+/// con vectores KAT conocidos. NO usar en produccion.
+///
+/// Args:
+///     public_key: Clave publica del receptor (bytes).
+///     m: Mensaje de 32 bytes a encapsular.
+///     level: Nivel de seguridad.
+///
+/// Returns:
+///     Tupla (capsule: bytes, shared_secret: bytes, m: bytes).
+///
+/// Raises:
+///     InvalidParameterError: Si los parametros tienen tamano incorrecto.
+#[pyfunction]
+#[pyo3(signature = (public_key, m, level=SecurityLevel::MlKem768))]
+pub fn encapsulate_deterministic<'py>(
+    py: Python<'py>,
+    public_key: &[u8],
+    m: &[u8],
+    level: SecurityLevel,
+) -> PyResult<(
+    Bound<'py, PyBytes>,
+    Bound<'py, PyBytes>,
+    Bound<'py, PyBytes>,
+)> {
+    // Validate m size
+    if m.len() != 32 {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "El mensaje 'm' debe tener exactamente 32 bytes",
+        ));
+    }
+
+    let m_array: [u8; 32] = m.try_into().unwrap();
+    let core_level: aegisq_core::kem::SecurityLevel = level.into();
+
+    let result =
+        py.detach(|| aegisq_core::kem::encapsulate_deterministic(public_key, &m_array, core_level));
+
+    match result {
+        Ok(enc_result) => {
+            let capsule = PyBytes::new(py, &enc_result.capsule);
+            let shared_secret = PyBytes::new(py, &enc_result.shared_secret);
+            let m_bytes = PyBytes::new(py, &enc_result.m);
+            Ok((capsule, shared_secret, m_bytes))
+        }
         Err(e) => Err(core_error_to_pyerr(e)),
     }
 }

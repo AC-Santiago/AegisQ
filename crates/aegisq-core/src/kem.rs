@@ -6,8 +6,8 @@
 
 use crate::error::AegisQError;
 use crate::mlkem::decaps::ml_kem_decaps;
-use crate::mlkem::encaps::ml_kem_encaps;
-use crate::mlkem::keygen::ml_kem_keygen;
+use crate::mlkem::encaps::{ml_kem_encaps, ml_kem_encaps_deterministic};
+use crate::mlkem::keygen::{ml_kem_keygen, ml_kem_keygen_deterministic};
 
 /// Nivel de seguridad ML-KEM segun FIPS 203.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -71,6 +71,16 @@ pub struct EncapsulationResult {
     pub capsule: alloc::vec::Vec<u8>,
     /// Shared secret de 32 bytes.
     pub shared_secret: alloc::vec::Vec<u8>,
+}
+
+/// Resultado de una encapsulacion determinista (para KAT vector validation).
+pub struct DeterministicEncapsulationResult {
+    /// Capsula (ciphertext KEM) para enviar al receptor.
+    pub capsule: alloc::vec::Vec<u8>,
+    /// Shared secret de 32 bytes.
+    pub shared_secret: alloc::vec::Vec<u8>,
+    /// Mensaje `m` usado (32 bytes) — útil para debugging.
+    pub m: [u8; 32],
 }
 
 // --- Funciones publicas ---
@@ -140,4 +150,68 @@ pub fn decapsulate(
     level: SecurityLevel,
 ) -> Result<alloc::vec::Vec<u8>, AegisQError> {
     ml_kem_decaps(capsule, secret_key, level)
+}
+
+// --- Funciones deterministas para KAT vector validation ---
+
+/// Genera un par de claves ML-KEM usando seeds especificos.
+///
+/// Esta version es DETERMINISTA y debe usarse SOLO para validacion
+/// con vectores KAT conocidos. NO usar en produccion.
+///
+/// Corresponde a FIPS 203 Alg. 15 (ML-KEM.KeyGen).
+///
+/// # Arguments
+/// - `d`: Seed de 32 bytes para generacion de claves K-PKE
+/// - `z`: Seed de 32 bytes para el contenido de la clave secreta
+/// - `level`: Nivel de seguridad ML-KEM
+///
+/// # Returns
+/// Un `KeyPair` con las claves generadas.
+pub fn generate_keypair_deterministic(d: &[u8; 32], z: &[u8; 32], level: SecurityLevel) -> KeyPair {
+    let (public_key, secret_key) = ml_kem_keygen_deterministic(d, z, level);
+    KeyPair {
+        public_key,
+        secret_key,
+        level,
+    }
+}
+
+/// Encapsula un shared secret usando un mensaje especifico.
+///
+/// Esta version es DETERMINISTA y debe usarse SOLO para validacion
+/// con vectores KAT conocidos. NO usar en produccion.
+///
+/// Corresponde a FIPS 203 Alg. 16 (ML-KEM.Encaps).
+///
+/// # Arguments
+/// - `public_key`: Clave publica del receptor
+/// - `m`: Mensaje de 32 bytes a encapsular
+/// - `level`: Nivel de seguridad ML
+///
+/// # Returns
+/// Un `DeterministicEncapsulationResult` con la capsula, shared secret y el mensaje usado.
+///
+/// # Errors
+/// - `AegisQError::InvalidParameter` si el tamano de la clave publica es incorrecto
+pub fn encapsulate_deterministic(
+    public_key: &[u8],
+    m: &[u8; 32],
+    level: SecurityLevel,
+) -> Result<DeterministicEncapsulationResult, AegisQError> {
+    // Validate ek size
+    let params = crate::mlkem::params::params_for_level(level);
+    let expected_ek_len = params.k * 384 + 32;
+    if public_key.len() != expected_ek_len {
+        return Err(AegisQError::InvalidParameter(
+            "encryption key publica tiene tamano incorrecto",
+        ));
+    }
+
+    let (shared_secret, capsule) = ml_kem_encaps_deterministic(public_key, m, level);
+    Ok(DeterministicEncapsulationResult {
+        capsule,
+        shared_secret,
+        m: *m,
+    })
 }
