@@ -12,15 +12,15 @@ encapsulate_deterministic) son SOLO para testing. NO usar en produccion.
 """
 
 import json
-import pytest
 from pathlib import Path
+
+import pytest
 
 from aegisq._aegisq_core import (
     SecurityLevel,
-    generate_keypair_deterministic,
     encapsulate_deterministic,
+    generate_keypair_deterministic,
 )
-
 
 # Rutas a los archivos JSON con vectores KAT
 KAT_DIR = Path(__file__).parent / "json-files"
@@ -69,7 +69,7 @@ class TestKeyGenVectors:
     def keygen_vectors(self):
         """Carga los vectores KeyGen desde JSON."""
         internal_file = KAT_DIR / "ML-KEM-keyGen-FIPS203" / "internalProjection.json"
-        with open(internal_file, "r") as f:
+        with open(internal_file) as f:
             return json.load(f)
 
     @pytest.mark.parametrize(
@@ -139,7 +139,7 @@ class TestEncapDecapVectors:
         internal_file = (
             KAT_DIR / "ML-KEM-encapDecap-FIPS203" / "internalProjection.json"
         )
-        with open(internal_file, "r") as f:
+        with open(internal_file) as f:
             return json.load(f)
 
     @pytest.mark.parametrize(
@@ -279,7 +279,7 @@ class TestVectorStructureValidation:
     def test_keygen_internal_projection_structure(self):
         """Verifica estructura del JSON de KeyGen."""
         internal_file = KAT_DIR / "ML-KEM-keyGen-FIPS203" / "internalProjection.json"
-        with open(internal_file, "r") as f:
+        with open(internal_file) as f:
             data = json.load(f)
 
         assert "testGroups" in data
@@ -301,7 +301,7 @@ class TestVectorStructureValidation:
         internal_file = (
             KAT_DIR / "ML-KEM-encapDecap-FIPS203" / "internalProjection.json"
         )
-        with open(internal_file, "r") as f:
+        with open(internal_file) as f:
             data = json.load(f)
 
         assert "testGroups" in data
