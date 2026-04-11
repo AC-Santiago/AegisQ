@@ -9,7 +9,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 # abi3-py311: genera un único wheel ABI3 compatible con Python 3.11+
-# (coincide con requires-python = ">=3.11" en pyproject.toml).
-# Reduce el número de wheels necesarios al mínimo sin sacrificar compatibilidad.
 pyo3        = { version = "0.28", features = ["extension-module", "abi3-py311"] }
 aegisq-core = { path = "../aegisq-core" }

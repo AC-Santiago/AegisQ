@@ -1,9 +1,10 @@
 [project]
+<<<<<<< HEAD
 name = "aegisq-pqc"
-version = "0.1.0"
+version = "1.0.0"
 description = "Post-quantum cryptography engine — Hybrid ML-KEM + AES-256-GCM (FIPS 203)"
 readme = "README.md"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 authors = [
     { name = "AC-Santiago", email = "acostasantiago311124578@gmail.com" }
 ]
@@ -39,7 +40,7 @@ classifiers = [
 
 [project.urls]
 Homepage   = "https://github.com/AC-Santiago/AegisQ"
-Repository = "https://github.com/AC-Santiago/AegisQ"
+Repository = "https://github.com/AC-Santiago/AegisQ.git"
 Issues     = "https://github.com/AC-Santiago/AegisQ/issues"
 
 [tool.maturin]
