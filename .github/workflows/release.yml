@@ -191,3 +191,49 @@ jobs:
         # Autenticación via OIDC Trusted Publisher (sin usuario/contraseña).
         # Configurar en: https://pypi.org/manage/account/publishing/
         # Environment name: pypi | Workflow: release.yml
+
+  # ── Crear GitHub Release con notas del CHANGELOG ─────────────────────────
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [check-branch, publish]
+    # Solo se crea release en GitHub para tags estables (sin rc) desde main
+    if: |
+      !contains(github.ref, 'rc') &&
+      needs.check-branch.outputs.branch == 'main'
+    permissions:
+      contents: write   # Requerido para crear releases
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+
+      - name: Extract CHANGELOG entry for this version
+        id: changelog
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}   # quita el prefijo 'v'
+          # Extrae el bloque del CHANGELOG entre este tag y el anterior
+          NOTES=$(awk "/^## \[${VERSION}\]/,/^## \[/" CHANGELOG.md \
+            | head -n -1 \
+            | tail -n +2)
+          # Exporta como variable multilinea para el siguiente step
+          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$NOTES"    >> "$GITHUB_OUTPUT"
+          echo "EOF"       >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "aegisq-pqc ${{ github.ref_name }}"
+          body: ${{ steps.changelog.outputs.notes }}
+          draft: false
+          prerelease: false
+          files: dist/*
+          fail_on_unmatched_files: false
