@@ -1,5 +1,4 @@
 [project]
-<<<<<<< HEAD
 name = "aegisq-pqc"
 version = "1.0.0"
 description = "Post-quantum cryptography engine — Hybrid ML-KEM + AES-256-GCM (FIPS 203)"
