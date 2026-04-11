@@ -1,0 +1,86 @@
+# Política de Seguridad
+
+## Versiones soportadas
+
+| Versión | Soporte de seguridad |
+|---|---|
+| 1.0.x | ✅ Activo |
+
+## Reporte de vulnerabilidades
+
+**Por favor, no reportes vulnerabilidades de seguridad como Issues públicos de GitHub.**
+
+AegisQ implementa primitivas criptográficas post-cuánticas. Un reporte público de una
+vulnerabilidad antes de que esté parcheada puede poner en riesgo a usuarios del paquete.
+
+### Cómo reportar
+
+Usa el canal de **reporte privado de vulnerabilidades** de GitHub:
+
+1. Ve a la pestaña [Security](https://github.com/AC-Santiago/AegisQ/security) del repositorio
+2. Haz clic en **"Report a vulnerability"**
+3. Completa el formulario con la mayor cantidad de detalle posible
+
+Recibirás una respuesta en un plazo máximo de **72 horas**.
+
+### Qué incluir en el reporte
+
+Para acelerar la evaluación, incluye:
+
+- **Descripción**: Descripción clara de la vulnerabilidad y su impacto potencial
+- **Componente afectado**: Módulo, clase o función específica (`MlKem`, `AegisCipher`, etc.)
+- **Pasos para reproducir**: Código mínimo que demuestre el problema
+- **Versión afectada**: Versión de `aegisq-pqc` donde se reproduce
+- **Impacto estimado**: Confidencialidad, integridad, disponibilidad
+- **Posible mitigación**: Si tienes sugerencias de cómo corregirlo
+
+### Proceso de respuesta
+
+```
+Reporte recibido → Confirmación (≤72h) → Evaluación (≤7 días) → Parche + CVE → Disclosure público
+```
+
+1. **Confirmación** (≤ 72 horas): Acuse de recibo y asignación de severidad preliminar
+2. **Evaluación** (≤ 7 días): Reproducción, análisis de impacto y plan de mitigación
+3. **Parche**: Desarrollo y revisión del fix, coordinar embargo con el reportador
+4. **CVE**: Solicitud de CVE si aplica
+5. **Disclosure**: Publicación coordinada del advisory y release del parche
+
+### Reconocimiento
+
+Los investigadores que reporten vulnerabilidades válidas serán reconocidos en el
+`CHANGELOG.md` de la versión que incluya el parche, salvo que prefieran permanecer anónimos.
+
+---
+
+## Consideraciones de seguridad del diseño
+
+### Qué protege AegisQ
+
+- **Confidencialidad** del shared secret y del payload cifrado
+- **Autenticidad** del ciphertext via AES-256-GCM (tag de 128 bits)
+- **Resistencia post-cuántica** del intercambio de claves (ML-KEM, FIPS 203)
+
+### Qué NO protege AegisQ
+
+- **Gestión de claves a largo plazo**: AegisQ no almacena ni gestiona claves persistentes.
+  La seguridad de las claves generadas depende de cómo el usuario las almacene.
+- **Anonimato o privacidad de metadatos**: AegisQ no oculta quién se comunica con quién.
+- **Autenticación de identidad**: ML-KEM es un KEM, no un esquema de firma.
+  Para autenticación de origen usa un esquema de firma post-cuántica (ej: ML-DSA / FIPS 204).
+
+### Dependencias criptográficas (Rust)
+
+| Crate | Propósito | Auditoría |
+|---|---|---|
+| `ml-kem` (via sha3, aes-gcm) | ML-KEM FIPS 203 | RustCrypto — auditado |
+| `aes-gcm` | AES-256-GCM FIPS 197 | RustCrypto — auditado |
+| `zeroize` | Zeroización de memoria sensible | RustCrypto — auditado |
+| `rand_core` | CSPRNG del sistema operativo | RustCrypto — auditado |
+
+### Nivel de madurez
+
+AegisQ es un proyecto en estado **Alpha (v1.0.0)**. Aunque implementa los estándares FIPS
+correctamente y los vectores KAT de NIST pasan, **no ha sido sometido a una auditoría de
+seguridad independiente**. No se recomienda su uso en sistemas productivos críticos sin
+una auditoría previa.

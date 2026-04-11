@@ -1,13 +1,46 @@
 [project]
-name = "aegisq"
-version = "0.1.0"
-description = "Post-quantum cryptography engine — Hybrid ML-KEM + AES-256-GCM"
+name = "aegisq-pqc"
+version = "1.0.0"
+description = "Post-quantum cryptography engine — Hybrid ML-KEM + AES-256-GCM (FIPS 203)"
 readme = "README.md"
+license = { file = "LICENSE" }
 authors = [
     { name = "AC-Santiago", email = "acostasantiago311124578@gmail.com" }
 ]
 requires-python = ">=3.11"
 dependencies = []
+keywords = [
+    "post-quantum",
+    "cryptography",
+    "ml-kem",
+    "kyber",
+    "pqc",
+    "fips-203",
+    "key-encapsulation",
+    "lattice-cryptography",
+    "aes-gcm",
+    "rust",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Topic :: Security :: Cryptography",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
+
+[project.urls]
+Homepage   = "https://github.com/AC-Santiago/AegisQ"
+Repository = "https://github.com/AC-Santiago/AegisQ.git"
+Issues     = "https://github.com/AC-Santiago/AegisQ/issues"
 
 [tool.maturin]
 manifest-path = "crates/aegisq-pyo3/Cargo.toml"

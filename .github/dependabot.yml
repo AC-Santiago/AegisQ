@@ -1,0 +1,43 @@
+version: 2
+
+updates:
+  # ── Dependencias de GitHub Actions ─────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Bogota"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci(deps)"
+
+  # ── Dependencias de Cargo (Rust) ────────────────────────────────────────────
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Bogota"
+    labels:
+      - "dependencies"
+      - "rust"
+    commit-message:
+      prefix: "build(deps)"
+    # Agrupar todas las actualizaciones de crates de RustCrypto en un solo PR
+    groups:
+      rust-crypto:
+        patterns:
+          - "aes-gcm"
+          - "sha3"
+          - "zeroize"
+          - "subtle"
+          - "rand_core"
+          - "thiserror"
+      pyo3:
+        patterns:
+          - "pyo3"

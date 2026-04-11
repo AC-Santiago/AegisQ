@@ -1,0 +1,239 @@
+name: Release to PyPI
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Estrategia de ramas y tags:
+#
+#   develop → tag v*rc*  → TestPyPI   (release candidates, ej: v1.0.0rc1)
+#   main    → tag v*     → PyPI prod  (releases estables,  ej: v1.0.0)
+#
+# El job publish-testpypi verifica en runtime que el tag proviene de develop.
+# El job publish       verifica en runtime que el tag proviene de main.
+# Esto evita publicaciones accidentales cruzadas.
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Validar origen del tag ────────────────────────────────────────────────
+  # Determina desde qué rama se creó el tag y expone ese valor a los demás jobs.
+  check-branch:
+    name: Check tag origin branch
+    runs-on: ubuntu-latest
+    outputs:
+      branch: ${{ steps.get-branch.outputs.branch }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0   # necesario para ver el historial completo de ramas
+
+      - name: Detect branch containing this tag
+        id: get-branch
+        run: |
+          # Busca en qué rama remota existe el commit del tag
+          TAG_COMMIT=$(git rev-list -n 1 "$GITHUB_REF_NAME")
+          # Prioriza 'main' y 'develop' antes de otras ramas
+          BRANCH=$(git branch -r --contains "$TAG_COMMIT" \
+            | sed 's|origin/||' \
+            | sed 's/^[[:space:]]*//' \
+            | grep -E '^(main|develop)$' \
+            | head -1)
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+          echo "Tag '$GITHUB_REF_NAME' found on branch: '${BRANCH}'"
+
+  # ── Build wheels: Linux (manylinux) ──────────────────────────────────────
+  build-linux:
+    name: Build • Linux (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64, aarch64]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist --interpreter 3.11 3.12 3.13
+          manylinux: auto
+          before-script-linux: |
+            yum install -y openssl-devel || true
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheels-linux-${{ matrix.target }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  # ── Build wheels: Windows ─────────────────────────────────────────────────
+  build-windows:
+    name: Build • Windows (x86_64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: x86_64
+          args: --release --out dist --interpreter 3.11 3.12 3.13
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheels-windows-x86_64
+          path: dist/*.whl
+          if-no-files-found: error
+
+  # ── Build wheels: macOS (Intel + Apple Silicon) ───────────────────────────
+  build-macos:
+    name: Build • macOS (${{ matrix.target }})
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64, aarch64]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist --interpreter 3.11 3.12 3.13
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheels-macos-${{ matrix.target }}
+          path: dist/*.whl
+          if-no-files-found: error
+
+  # ── Build source distribution (sdist) ────────────────────────────────────
+  build-sdist:
+    name: Build • sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheels-sdist
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  # ── Publish to TestPyPI (tags v*rc* desde develop) ───────────────────────
+  publish-testpypi:
+    name: Publish to TestPyPI
+    runs-on: ubuntu-latest
+    needs: [check-branch, build-linux, build-windows, build-macos, build-sdist]
+    # Condiciones:
+    #   1. El tag debe contener 'rc' (release candidate)
+    #   2. El tag debe provenir de la rama 'develop'
+    if: |
+      contains(github.ref, 'rc') &&
+      needs.check-branch.outputs.branch == 'develop'
+    environment: testpypi
+    permissions:
+      id-token: write   # Requerido para OIDC (Trusted Publisher)
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+
+      - name: List artifacts to publish
+        run: ls -lh dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # Autenticación via OIDC Trusted Publisher (sin usuario/contraseña).
+          # Configurar en: https://test.pypi.org/manage/account/publishing/
+          # Environment name: testpypi | Workflow: release.yml
+
+  # ── Publish to PyPI prod (tags v* sin rc desde main) ─────────────────────
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [check-branch, build-linux, build-windows, build-macos, build-sdist]
+    # Condiciones:
+    #   1. El tag NO debe contener 'rc' (release estable)
+    #   2. El tag debe provenir de la rama 'main'
+    if: |
+      !contains(github.ref, 'rc') &&
+      needs.check-branch.outputs.branch == 'main'
+    environment: pypi
+    permissions:
+      id-token: write   # Requerido para OIDC (Trusted Publisher)
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+
+      - name: List artifacts to publish
+        run: ls -lh dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        # Autenticación via OIDC Trusted Publisher (sin usuario/contraseña).
+        # Configurar en: https://pypi.org/manage/account/publishing/
+        # Environment name: pypi | Workflow: release.yml
+
+  # ── Crear GitHub Release con notas del CHANGELOG ─────────────────────────
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [check-branch, publish]
+    # Solo se crea release en GitHub para tags estables (sin rc) desde main
+    if: |
+      !contains(github.ref, 'rc') &&
+      needs.check-branch.outputs.branch == 'main'
+    permissions:
+      contents: write   # Requerido para crear releases
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+
+      - name: Extract CHANGELOG entry for this version
+        id: changelog
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}   # quita el prefijo 'v'
+          # Extrae el bloque del CHANGELOG entre este tag y el anterior
+          NOTES=$(awk "/^## \[${VERSION}\]/,/^## \[/" CHANGELOG.md \
+            | head -n -1 \
+            | tail -n +2)
+          # Exporta como variable multilinea para el siguiente step
+          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$NOTES"    >> "$GITHUB_OUTPUT"
+          echo "EOF"       >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "aegisq-pqc ${{ github.ref_name }}"
+          body: ${{ steps.changelog.outputs.notes }}
+          draft: false
+          prerelease: false
+          files: dist/*
+          fail_on_unmatched_files: false

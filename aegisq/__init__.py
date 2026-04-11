@@ -45,4 +45,9 @@ __all__ = [
     "RngError",
 ]
 
-__version__ = "0.1.0"
+from importlib.metadata import version as _version
+
+try:
+    __version__ = _version("aegisq-pqc")
+except Exception:  # paquete no instalado (ej: desarrollo local con maturin develop)
+    __version__ = "unknown"
