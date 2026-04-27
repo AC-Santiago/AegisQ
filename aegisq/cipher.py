@@ -28,6 +28,8 @@ Ejemplo::
 
 from __future__ import annotations
 
+import asyncio
+
 from aegisq._aegisq_core import (
     KeyPair,
     SecurityLevel,
@@ -112,3 +114,63 @@ class AegisCipher:
 
     def __repr__(self) -> str:
         return f"AegisCipher(level={self._level!r})"
+
+    async def encrypt_async(
+        self,
+        plaintext: bytes,
+        recipient_public_key: bytes,
+    ) -> bytes:
+        """Cifra datos de forma asincrona usando el esquema hibrido.
+
+        Este metodo ejecuta la operacion de cifrado en un ThreadPoolExecutor
+        sin bloquear el event loop. No requiere cambios en Rust ni PyO3.
+
+        Args:
+            plaintext: Datos a cifrar (cualquier longitud).
+            recipient_public_key: Clave publica ML-KEM del receptor.
+
+        Returns:
+            Transit Package como ``bytes``:
+            ``[ML-KEM Capsule | AES Nonce (12B) | Auth Tag (16B) | Ciphertext]``
+
+        Raises:
+            InvalidParameterError: Si la clave publica tiene tamano incorrecto.
+            RngError: Si el CSPRNG del OS no esta disponible.
+        """
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            self.encrypt,
+            plaintext,
+            recipient_public_key,
+        )
+
+    async def decrypt_async(
+        self,
+        encrypted_package: bytes,
+        secret_key: bytes,
+    ) -> bytes:
+        """Descifra un Transit Package de forma asincrona.
+
+        Este metodo ejecuta la operacion de descifrado en un ThreadPoolExecutor
+        sin bloquear el event loop. No requiere cambios en Rust ni PyO3.
+
+        Args:
+            encrypted_package: Transit Package completo recibido.
+            secret_key: Clave secreta ML-KEM propia.
+
+        Returns:
+            Plaintext original como ``bytes``.
+
+        Raises:
+            DecryptionError: Si el Auth Tag de AES-GCM es invalido
+                (payload manipulado o clave incorrecta).
+            InvalidParameterError: Si el paquete tiene tamano incorrecto.
+        """
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            self.decrypt,
+            encrypted_package,
+            secret_key,
+        )
