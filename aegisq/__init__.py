@@ -30,11 +30,14 @@ from aegisq.exceptions import (
     DecryptionError,
     InvalidParameterError,
     RngError,
+    SessionExpiredError,
 )
 from aegisq.kem import MlKem
+from aegisq.session import EphemeralSession
 
 __all__ = [
     "AegisCipher",
+    "EphemeralSession",
     "KeyPair",
     "MlKem",
     "SecurityLevel",
@@ -43,6 +46,7 @@ __all__ = [
     "DecryptionError",
     "InvalidParameterError",
     "RngError",
+    "SessionExpiredError",
 ]
 
 from importlib.metadata import version as _version
