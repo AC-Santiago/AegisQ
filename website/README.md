@@ -1,49 +1,59 @@
-# Starlight Starter Kit: Basics
+# AegisQ Documentation
 
 [![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://python.org)
+[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://rustup.rs/)
+
+Documentation site for **AegisQ** — a post-quantum cryptographic library for Python.
+
+AegisQ combines ML-KEM (FIPS 203) for quantum-resistant key encapsulation with AES-256-GCM for authenticated symmetric encryption. The cryptographic core is written in Rust, exposed to Python via PyO3.
+
+## Quick Start
+
+```bash
+# Install dependencies
+pnpm install
+
+# Start local dev server at localhost:4321
+pnpm dev
+
+# Build for production
+pnpm build
+
+# Preview production build locally
+pnpm preview
+```
+
+## Project Structure
 
 ```
-pnpm create astro@latest -- --template starlight
-```
-
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
-
-## 🚀 Project Structure
-
-Inside of your Astro + Starlight project, you'll see the following folders and files:
-
-```
-.
-├── public/
+website/
+├── public/              # Static assets (favicon, etc.)
 ├── src/
-│   ├── assets/
+│   ├── assets/          # Images used in docs
 │   ├── content/
-│   │   └── docs/
+│   │   └── docs/        # Markdown/MDX documentation files
 │   └── content.config.ts
-├── astro.config.mjs
+├── astro.config.mjs      # Starlight configuration
 ├── package.json
 └── tsconfig.json
 ```
 
-Starlight looks for `.md` or `.mdx` files in the `src/content/docs/` directory. Each file is exposed as a route based on its file name.
+Documentation lives in `src/content/docs/` as `.md` or `.mdx` files. Starlight automatically generates routes from the file structure, matching the sidebar defined in `astro.config.mjs`.
 
-Images can be added to `src/assets/` and embedded in Markdown with a relative link.
+## Useful Commands
 
-Static assets, like favicons, can be placed in the `public/` directory.
+| Command              | Action                                       |
+| :------------------- | :------------------------------------------- |
+| `pnpm dev`           | Start local dev server at `localhost:4321`   |
+| `pnpm build`         | Build production site to `./dist/`           |
+| `pnpm preview`       | Preview built site locally before deploying  |
+| `pnpm astro check`   | Type-check the Astro project                 |
+| `pnpm astro add <pkg>` | Add an integration (e.g., sitemap)          |
 
-## 🧞 Commands
+## Resources
 
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `pnpm install`             | Installs dependencies                            |
-| `pnpm dev`             | Starts local dev server at `localhost:4321`      |
-| `pnpm build`           | Build your production site to `./dist/`          |
-| `pnpm preview`         | Preview your build locally, before deploying     |
-| `pnpm astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `pnpm astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Check out [Starlight’s docs](https://starlight.astro.build/), read [the Astro documentation](https://docs.astro.build), or jump into the [Astro Discord server](https://astro.build/chat).
+- [AegisQ on PyPI](https://pypi.org/project/aegisq-pqc/) — Install via pip or uv
+- [AegisQ on GitHub](https://github.com/AC-Santiago/AegisQ/) — Source code, issues, PRs
+- [FIPS 203 (ML-KEM Standard)](https://csrc.nist.gov/pubs/fips/203/final) — NIST specification
+- [Starlight Docs](https://starlight.astro.build/) — Astro documentation theme docs

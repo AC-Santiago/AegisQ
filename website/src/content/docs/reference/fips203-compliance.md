@@ -5,7 +5,9 @@ description: AegisQ implementation roadmap, standards compliance, and Rust depen
 
 ## Implementation Roadmap
 
-AegisQ was developed in 25 strict phases. Each phase had to pass all tests before advancing to the next.
+AegisQ was developed in 27 phases. Each phase had to pass all tests before advancing to the next.
+
+v1.1 is currently in development with phases 28–29 pending.
 
 | Phase | Component | Reference | Status |
 |-------|-----------|-----------|--------|
@@ -21,7 +23,7 @@ AegisQ was developed in 25 strict phases. Each phase had to pass all tests befor
 | 10 | Public KEM API (`kem.rs`) | — | ✅ |
 | 11 | AES-256-GCM Hybrid (`hybrid.rs`) | NIST SP 800-38D | ✅ |
 | 12 | FFI error types | — | ✅ |
-| 13 | PyO3 types (KeyPair, EncryptedPackage) | — | ✅ |
+| 13 | PyO3 types (KeyPair, SecurityLevel) | — | ✅ |
 | 14 | PyO3 KEM bindings | — | ✅ |
 | 15 | PyO3 Hybrid bindings | — | ✅ |
 | 16 | PyO3 module registration | — | ✅ |
@@ -33,7 +35,17 @@ AegisQ was developed in 25 strict phases. Each phase had to pass all tests befor
 | 22 | KEM bridge tests | — | ✅ |
 | 23 | Hybrid bridge tests | — | ✅ |
 | 24 | AegisCipher end-to-end tests | — | ✅ |
-| 25 | NIST KATs + ML-KEM integration tests | NIST vectors | ✅ |
+| 25 | KEM API tests + NIST KAT vectors | — | ✅ |
+| 26 | GitHub Actions CI/CD | — | ✅ |
+| 27 | NIST ACVP KAT vector JSON files | NIST vectors | ✅ |
+| 27b | KAT vector verification tests | NIST vectors | ✅ |
+
+**v1.1 (Pending)**
+
+| Phase | Component | Reference | Status |
+|-------|-----------|-----------|--------|
+| 28 | EphemeralSession (forward secrecy) | — | 🔲 |
+| 29 | Async support (`encrypt_async`, `decrypt_async`) | — | 🔲 |
 
 ## Standards Compliance
 
