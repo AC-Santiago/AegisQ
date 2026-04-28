@@ -127,11 +127,13 @@ class EphemeralSession:
         """Cierra la sesion y destruye la clave secreta efimera.
 
         Este metodo es seguro llamarlo multiples veces.
+
+        Nota: la zeroizacion de la clave secreta en memoria es responsabilidad
+        de la capa Rust. Ver Issue #10 para tracking de esta mejora.
         """
         if self._closed:
             return
         self._closed = True
-        # El keypair se descarta; si tuviera zeroize, la memoria se limpia
         self._keypair = None
 
     def _check_closed(self) -> None:
@@ -150,11 +152,17 @@ class EphemeralSession:
         self.close()
 
     def __del__(self) -> None:
-        """Destructor - asegura destruccion de clave en lo posible."""
-        # Si Python sale limpiamente, close() ya fue llamado
-        # Si no, el garbage collector intentara limpiar
-        if not self._closed:
-            self.close()
+        """Destructor - asegura destruccion de clave en lo posible.
+
+        Protegido contra objetos parcialmente inicializados si __init__ fallo.
+        """
+        try:
+            if not getattr(self, "_closed", True):
+                self.close()
+        except Exception:
+            # Un destructor nunca debe propagar excepciones, especialmente
+            # si el objeto quedo parcialmente inicializado.
+            pass
 
     def __repr__(self) -> str:
         status = "closed" if self._closed else "open"
