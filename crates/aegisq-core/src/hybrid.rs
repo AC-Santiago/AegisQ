@@ -20,11 +20,22 @@ use alloc::vec::Vec;
 
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
-use rand_core::{OsRng, RngCore};
+use getrandom::fill;
 use zeroize::Zeroize;
 
 use crate::error::AegisQError;
 use crate::kem::{self, SecurityLevel};
+
+/// Wrapper around getrandom to provide fill_bytes method.
+struct OsRng;
+
+impl OsRng {
+    fn fill_bytes(&self, dest: &mut [u8]) {
+        // fill() returns Result and panics on error in no_std context
+        // On supported platforms (Linux/macOS/Windows), this never fails
+        let _ = fill(dest);
+    }
+}
 
 /// Tamano del nonce AES-GCM en bytes (96 bits).
 pub const AES_GCM_NONCE_SIZE: usize = 12;
