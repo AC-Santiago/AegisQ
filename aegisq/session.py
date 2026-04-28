@@ -121,7 +121,9 @@ class EphemeralSession:
         self._check_closed()
         if self._keypair is None:
             raise SessionExpiredError("Sesion efimera sin clave privada")
-        return bytes(decrypt_hybrid(encrypted_package, self._keypair.secret_key, self._level))
+        return bytes(
+            decrypt_hybrid(encrypted_package, self._keypair.secret_key, self._level)
+        )
 
     def close(self) -> None:
         """Cierra la sesion y destruye la clave secreta efimera.

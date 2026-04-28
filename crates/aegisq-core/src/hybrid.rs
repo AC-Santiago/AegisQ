@@ -20,11 +20,23 @@ use alloc::vec::Vec;
 
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
-use rand_core::{OsRng, RngCore};
+use getrandom::fill;
 use zeroize::Zeroize;
 
 use crate::error::AegisQError;
 use crate::kem::{self, SecurityLevel};
+
+/// Wrapper around getrandom to provide fill_bytes method.
+struct OsRng;
+
+impl OsRng {
+    fn fill_bytes(&self, dest: &mut [u8]) -> Result<(), AegisQError> {
+        // `fill()` returns Result; on failure, propagate as RngError.
+        // This ensures we never silently use zero-entropy random data.
+        fill(dest).map_err(|_| AegisQError::RngError)?;
+        Ok(())
+    }
+}
 
 /// Tamano del nonce AES-GCM en bytes (96 bits).
 pub const AES_GCM_NONCE_SIZE: usize = 12;
@@ -69,7 +81,7 @@ pub fn encrypt(
 
     // 2. Generar nonce aleatorio de 12 bytes via OsRng
     let mut nonce_bytes = [0u8; AES_GCM_NONCE_SIZE];
-    OsRng.fill_bytes(&mut nonce_bytes);
+    OsRng.fill_bytes(&mut nonce_bytes)?;
 
     // 3. AES-256-GCM encrypt
     //    aes-gcm retorna ciphertext || tag concatenados

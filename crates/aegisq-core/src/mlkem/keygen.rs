@@ -13,7 +13,16 @@ use crate::kem::SecurityLevel;
 use crate::mlkem::math::poly::{Poly, PolyVec};
 use crate::mlkem::params::{MlKemParams, params_for_level};
 use crate::mlkem::sampling::{hash_g, hash_h, sample_noise_poly, sample_ntt};
-use rand_core::{OsRng, RngCore};
+use getrandom::fill;
+
+/// Wrapper around getrandom to provide try_fill_bytes method.
+struct OsRng;
+
+impl OsRng {
+    fn try_fill_bytes(&self, dest: &mut [u8]) -> Result<(), getrandom::Error> {
+        fill(dest)
+    }
+}
 
 // ---------------------------------------------------------------------------
 // K-PKE.KeyGen — FIPS 203 Algorithm 12
