@@ -4,7 +4,7 @@
 > Este documento es la fuente de verdad del proyecto. Cualquier decisión que contradiga
 > lo aquí escrito es incorrecta, sin importar cuánto "sentido" parezca tener en el momento.
 >
-> **Estado del Proyecto:** 27/29 fases completadas — v1.1 en desarrollo
+> **Estado del Proyecto:** 29/29 fases completadas — v1.1.0 listo para release
 
 ---
 
@@ -516,6 +516,8 @@ Cada fase debe tener sus tests pasando antes de avanzar a la siguiente.
 | 26   | `.github/workflows/ci.yml`                | CI/CD con GitHub Actions                             | ✅ Completo |
 | 27   | `tests/python/json-files/`               | Vectores KAT NIST ACVP para ML-KEM                  | ✅ Completo |
 | 27b  | `tests/python/test_kat_vectors.py`       | Tests de verificación con KAT vectors                | ✅ Completo |
+| 28   | `aegisq/session.py`                      | EphemeralSession con forward secrecy                | ✅ Completo |
+| 29   | `aegisq/cipher.py` + `test_cipher_async.py` | Soporte async (encrypt_async/decrypt_async)       | ✅ Completo |
 
 ---
 
@@ -565,8 +567,8 @@ Cada fase debe tener sus tests pasando antes de avanzar a la siguiente.
 | PyPI package name | `aegisq-pqc` | Nombre para `pip install` |
 | Python import name | `aegisq` | Nombre para `import aegisq` |
 | Módulo interno | `aegisq._aegisq_core` | El `.so` compilado por Maturin |
-| Versión actual | `1.0.0` | Sincronizado con `pyproject.toml` |
-| Siguiente versión | `1.1.0` | Tras completar fases 28-29 |
+| Versión actual | `1.1.0` | Sincronizado con `pyproject.toml` |
+| Siguiente versión | `1.2.0` | Por definir según roadmap de features |
 
 > ⚠️ **Nota:** No confundas el nombre del paquete PyPI (`aegisq-pqc`) con el nombre
 > del módulo Python (`aegisq`). Ambos son el mismo paquete; PyPI usa guiones
@@ -582,50 +584,7 @@ Cada fase debe tener sus tests pasando antes de avanzar a la siguiente.
 
 ---
 
-## 13. Fases Pendientes (v1.1)
-
-### Fase 28: EphemeralSession — Forward Secrecy (PENDIENTE)
-
-**Archivo a crear:** `aegisq/session.py`
-
-Implementar la clase `EphemeralSession` que:
-- En `__init__` genera un keypair efímero internamente (NUNCA lo expone al usuario).
-- Expone solo `public_key: bytes` como propiedad de solo lectura.
-- Tiene un método `encrypt(plaintext: bytes) -> bytes` que usa el keypair efímero.
-- Tiene un método `decrypt(encrypted_package: bytes) -> bytes` que usa el keypair efímero.
-- En `__del__` o usando un context manager (`__enter__`/`__exit__`) llama a zeroize
-  del secret_key (a través del binding PyO3 existente).
-- Lanza `SessionExpiredError` (nueva excepción en `exceptions.py`) si se intenta
-  usar después de que el contexto fue cerrado.
-- Exportarla en `aegisq/__init__.py` junto a las demás clases públicas.
-
-**Excepciones a agregar en `aegisq/exceptions.py`:**
-```python
-SessionExpiredError(AegisQError)
-```
-
----
-
-### Fase 29: Soporte Asíncrono (PENDIENTE)
-
-**Archivos a modificar:** `aegisq/cipher.py`, `tests/python/test_cipher_async.py`
-
-Agregar los métodos a `AegisCipher`:
-```python
-async def encrypt_async(self, plaintext: bytes, recipient_public_key: bytes) -> bytes
-async def decrypt_async(self, encrypted_package: bytes, secret_key: bytes) -> bytes
-```
-
-Implementación: usar `asyncio.get_event_loop().run_in_executor(None, ...)` para
-ejecutar las operaciones síncronas existentes en un ThreadPoolExecutor sin bloquear
-el event loop. NO requiere cambios en Rust ni en PyO3.
-
-**Nuevos archivos:**
-- `tests/python/test_cipher_async.py` — Tests para los métodos async
-
----
-
-## 14. Referencias Normativas
+## 13. Referencias Normativas
 
 | Documento | URL |
 |-----------|-----|
@@ -640,4 +599,4 @@ el event loop. NO requiere cambios en Rust ni en PyO3.
 
 ---
 
-*Última actualización: v1.1 — Secciones 12-13: Fases 28-29 pendientes (EphemeralSession, Async), Versionado (v1.0→v1.1).*
+*Última actualización: v1.1.0 — Todas las fases completadas. 29/29. Listo para release.*

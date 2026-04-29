@@ -4,7 +4,8 @@
 
 | Versión | Soporte de seguridad |
 |---|---|
-| 1.0.x | ✅ Activo |
+| 1.1.x | ✅ Activo |
+| 1.0.x | ✅ Mantenimiento (parches de seguridad únicamente) |
 
 ## Reporte de vulnerabilidades
 
@@ -80,7 +81,7 @@ Los investigadores que reporten vulnerabilidades válidas serán reconocidos en 
 
 ### Nivel de madurez
 
-AegisQ es un proyecto en estado **Alpha (v1.0.0)**. Aunque implementa los estándares FIPS
-correctamente y los vectores KAT de NIST pasan, **no ha sido sometido a una auditoría de
-seguridad independiente**. No se recomienda su uso en sistemas productivos críticos sin
-una auditoría previa.
+AegisQ es un proyecto en estado **Beta (v1.1.0)**. La implementación criptográfica
+es FIPS 203 compliant y ha pasado los vectores KAT de NIST. Se han realizado revisiones
+de seguridad internas del código Rust y los bindings FFI. Se recomienda auditoría
+independiente antes de uso en sistemas de alto riesgo.
