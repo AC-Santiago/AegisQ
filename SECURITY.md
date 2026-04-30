@@ -74,10 +74,10 @@ Los investigadores que reporten vulnerabilidades válidas serán reconocidos en 
 
 | Crate | Propósito | Auditoría |
 |---|---|---|
-| `ml-kem` (via sha3, aes-gcm) | ML-KEM FIPS 203 | RustCrypto — auditado |
+| `aegisq-core` (in-tree) | ML-KEM FIPS 203 — implementación propia, sin crate externo `ml-kem` | N/A (in-tree) |
 | `aes-gcm` | AES-256-GCM FIPS 197 | RustCrypto — auditado |
 | `zeroize` | Zeroización de memoria sensible | RustCrypto — auditado |
-| `rand_core` | CSPRNG del sistema operativo | RustCrypto — auditado |
+| `getrandom` | CSPRNG del sistema operativo | RustCrypto — auditado |
 
 ### Nivel de madurez
 
