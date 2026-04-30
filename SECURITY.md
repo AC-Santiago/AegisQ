@@ -4,7 +4,8 @@
 
 | Versión | Soporte de seguridad |
 |---|---|
-| 1.0.x | ✅ Activo |
+| 1.1.x | ✅ Activo |
+| 1.0.x | ✅ Mantenimiento (parches de seguridad únicamente) |
 
 ## Reporte de vulnerabilidades
 
@@ -73,14 +74,14 @@ Los investigadores que reporten vulnerabilidades válidas serán reconocidos en 
 
 | Crate | Propósito | Auditoría |
 |---|---|---|
-| `ml-kem` (via sha3, aes-gcm) | ML-KEM FIPS 203 | RustCrypto — auditado |
+| `aegisq-core` (in-tree) | ML-KEM FIPS 203 — implementación propia, sin crate externo `ml-kem` | N/A (in-tree) |
 | `aes-gcm` | AES-256-GCM FIPS 197 | RustCrypto — auditado |
 | `zeroize` | Zeroización de memoria sensible | RustCrypto — auditado |
-| `rand_core` | CSPRNG del sistema operativo | RustCrypto — auditado |
+| `getrandom` | CSPRNG del sistema operativo | RustCrypto — auditado |
 
 ### Nivel de madurez
 
-AegisQ es un proyecto en estado **Alpha (v1.0.0)**. Aunque implementa los estándares FIPS
-correctamente y los vectores KAT de NIST pasan, **no ha sido sometido a una auditoría de
-seguridad independiente**. No se recomienda su uso en sistemas productivos críticos sin
-una auditoría previa.
+AegisQ es un proyecto en estado **Beta (v1.1.0)**. La implementación criptográfica
+es FIPS 203 compliant y ha pasado los vectores KAT de NIST. Se han realizado revisiones
+de seguridad internas del código Rust y los bindings FFI. Se recomienda auditoría
+independiente antes de uso en sistemas de alto riesgo.

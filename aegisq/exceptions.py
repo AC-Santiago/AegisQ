@@ -27,4 +27,14 @@ __all__ = [
     "DecryptionError",
     "InvalidParameterError",
     "RngError",
+    "SessionExpiredError",
 ]
+
+
+class SessionExpiredError(AegisQError):
+    """Lanzada cuando se intenta usar una sesion efimera que ya fue cerrada.
+
+    Ocurre cuando se intenta invocar ``encrypt()`` o ``decrypt()`` en una
+    ``EphemeralSession`` despues de que el contexto fue cerrado explicitamente
+    via ``close()`` o al salir de un context manager ``with``.
+    """

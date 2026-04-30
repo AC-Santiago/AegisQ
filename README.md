@@ -31,6 +31,8 @@ plaintext = cipher.decrypt(package, keypair.secret_key)
 - **GIL release** — Rust crypto operations release the Python GIL via `py.detach()`, enabling true parallelism
 - **Type-safe** — Full PEP 561 type stubs with IDE autocompletion support
 - **Python 3.11+** — Built with PyO3 abi3 stable ABI for broad compatibility (3.11 through 3.13+)
+- **Ephemeral sessions with forward secrecy** — `EphemeralSession` class auto-generates keypairs and destroys secrets on close
+- **Async support** — `encrypt_async()` / `decrypt_async()` methods for non-blocking cryptographic operations
 
 ---
 
@@ -130,6 +132,20 @@ class AegisCipher:
     def generate_keypair(self) -> KeyPair
     def encrypt(self, plaintext: bytes, recipient_public_key: bytes) -> bytes
     def decrypt(self, encrypted_package: bytes, secret_key: bytes) -> bytes
+    async def encrypt_async(self, plaintext: bytes, recipient_public_key: bytes) -> bytes
+    async def decrypt_async(self, encrypted_package: bytes, secret_key: bytes) -> bytes
+```
+
+### `EphemeralSession` (forward secrecy)
+
+```python
+class EphemeralSession:
+    def __init__(self, level: SecurityLevel = SecurityLevel.ML_KEM_768) -> None
+    def public_key(self) -> bytes  # Read-only, secret key never exposed
+    def encrypt(self, plaintext: bytes, recipient_public_key: bytes) -> bytes
+    def decrypt(self, encrypted_package: bytes) -> bytes
+    def close(self) -> None
+    # Also supports context manager: `with EphemeralSession() as s: ...`
 ```
 
 ### `MlKem` (advanced, raw KEM operations)
@@ -156,9 +172,10 @@ class KeyPair:
 ```
 AegisQError(Exception)                          Base exception
 ├── DecapsulationError(AegisQError)             ML-KEM structural error (wrong buffer size)
-├── DecryptionError(AegisQError)                AES-GCM auth tag failed (tampered or wrong key)
+├── DecryptionError(AegisQError)               AES-GCM auth tag failed (tampered or wrong key)
 ├── InvalidParameterError(AegisQError, ValueError)  Incorrect parameter sizes
-└── RngError(AegisQError)                       OS CSPRNG unavailable
+├── RngError(AegisQError)                      OS CSPRNG unavailable
+└── SessionExpiredError(AegisQError)           Attempted operation on closed EphemeralSession
 ```
 
 All exceptions can be imported from the top-level package:
