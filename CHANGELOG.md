@@ -11,6 +11,26 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [1.1.0] - 2026-04-29
+
+### Added
+- `EphemeralSession` — Clase de sesiones efímeras con forward secrecy integrado.
+  Genera un keypair internamente, expone solo `public_key`, y destruye la clave
+  privada al cerrar la sesión (via context manager o `close()`).
+- `encrypt_async()` / `decrypt_async()` — Métodos asíncronos en `AegisCipher`
+  que ejecutan operaciones de cifrado/descifrado en un ThreadPoolExecutor sin
+  bloquear el event loop.
+- Sistema de skills locales en `.agents/skills/` con skills para Rust, Python,
+  FFI, y auditoría de seguridad.
+- `SessionExpiredError` — Nueva excepción para operaciones sobre sesiones cerradas.
+
+### Changed
+- `rand_core` actualizado 0.6 → 0.10 (mejoras de seguridad y rendimiento).
+- `getrandom` actualizado 0.3 → 0.4 (mejor soporte para plataformas).
+- Classifier de PyPI: "Development Status :: 3 - Alpha" → "Development Status :: 4 - Beta".
+
+---
+
 ## [1.0.0] - 2026-04-11
 
 ### Added
@@ -54,5 +74,6 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 | `Fixed` | Corrección de bugs |
 | `Security` | Correcciones de seguridad o cambios relevantes para la seguridad |
 
-[Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/AC-Santiago/AegisQ/releases/tag/v1.0.0
