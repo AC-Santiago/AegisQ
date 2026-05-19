@@ -60,6 +60,10 @@ class KeyPair:
         """Nivel de seguridad con el que se genero."""
         ...
 
+    def public_key_b64(self) -> str:
+        """Retorna la clave publica como Base64 URL-safe sin padding."""
+        ...
+
 # --- Funciones KEM ---
 
 def generate_keypair(
@@ -81,6 +85,17 @@ def decapsulate(
     level: SecurityLevel = SecurityLevel.ML_KEM_768,
 ) -> bytes:
     """Desencapsula el shared secret."""
+    ...
+
+def serialize_public_key(public_key: bytes) -> str:
+    """Serializa una llave publica ML-KEM a Base64 URL-safe sin padding."""
+    ...
+
+def deserialize_public_key(
+    b64: str,
+    level: SecurityLevel = SecurityLevel.ML_KEM_768,
+) -> bytes:
+    """Deserializa una llave publica desde Base64 URL-safe. Valida el tamano."""
     ...
 
 def generate_keypair_deterministic(

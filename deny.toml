@@ -1,0 +1,65 @@
+# AegisQ — cargo-deny configuration
+# Docs: https://embarkstudios.github.io/cargo-deny/
+# Versión de cargo-deny usada: 0.18.4 (via EmbarkStudios/cargo-deny-action@v2.0.13)
+
+# ── Licencias ──────────────────────────────────────────────────────────────────
+[licenses]
+# Todas las licencias se deniegan a menos que estén en esta lista.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+]
+
+# Umbral de confianza para la detección automática de licencias via askalono.
+# 0.8 es el default; 0.9 es más estricto y recomendado para proyectos de seguridad.
+confidence-threshold = 0.9
+
+# Los crates propios del workspace no necesitan licencia revisada (son el proyecto mismo).
+[licenses.private]
+ignore = true
+
+# ── Bans (duplicados y crates prohibidos) ──────────────────────────────────────
+[bans]
+# Denegar múltiples versiones del mismo crate. En un proyecto de seguridad,
+# versiones duplicadas son un vector de ataque (una puede tener CVE, la otra no).
+multiple-versions = "deny"
+
+# Denegar dependencias con versión wildcard (*).
+wildcards = "deny"
+
+# Permite wildcards en path-dependencies de crates privados (nuestros propios crates).
+allow-wildcard-paths = true
+
+# Mostrar el camino más corto al duplicado en el grafo de dependencias.
+highlight = "simplest-path"
+
+# Crates explícitamente prohibidos en AegisQ.
+# openssl: Usar en su lugar rustls/aes-gcm del ecosistema RustCrypto.
+deny = [
+    { crate = "openssl", use-instead = "aes-gcm", reason = "AegisQ usa exclusivamente RustCrypto. openssl introduce una FFI a C que rompe las garantías de seguridad de memoria." },
+    { crate = "native-tls", use-instead = "rustls", reason = "Same rationale as openssl." },
+]
+
+# ── Advisories (CVEs) ──────────────────────────────────────────────────────────
+[advisories]
+# Base de datos de advisories de RustSec.
+# La URL por defecto apunta a https://github.com/RustSec/advisory-db
+# No es necesario configurar nada adicional; cargo-deny usa la DB oficial.
+
+# Si un advisory no aplica al proyecto (e.g., solo afecta a una feature que no usamos),
+# se puede ignorar aquí con justificación:
+# ignore = ["RUSTSEC-XXXX-XXXX"]
+
+# ── Sources (orígenes permitidos) ──────────────────────────────────────────────
+[sources]
+# Solo se permiten crates de crates.io y del workspace local.
+unknown-registry = "deny"
+unknown-git = "deny"
+
+# Repositorios git permitidos explícitamente (ninguno por ahora).
+allow-git = []

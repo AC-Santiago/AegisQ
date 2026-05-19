@@ -19,6 +19,13 @@ pub enum AegisQError {
     /// Fallo en la verificacion del Auth Tag de AES-GCM.
     /// Indica que el ciphertext fue manipulado o que la clave es incorrecta.
     DecryptionFailed,
+
+    /// Error al decodificar una llave publica desde Base64.
+    ///
+    /// Se produce cuando el string provisto no es Base64 URL-safe valido
+    /// o cuando los bytes decodificados no tienen el tamano correcto
+    /// para el nivel de seguridad indicado.
+    Base64DecodeError(&'static str),
 }
 
 impl core::fmt::Display for AegisQError {
@@ -30,6 +37,7 @@ impl core::fmt::Display for AegisQError {
             AegisQError::DecryptionFailed => {
                 write!(f, "AES-GCM authentication tag verification failed")
             }
+            AegisQError::Base64DecodeError(msg) => write!(f, "base64 decode error: {}", msg),
         }
     }
 }
