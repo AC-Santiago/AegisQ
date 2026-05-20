@@ -5,6 +5,8 @@
 # ── Licencias ──────────────────────────────────────────────────────────────────
 [licenses]
 # Todas las licencias se deniegan a menos que estén en esta lista.
+# Se usan expresiones SPDX completas para cubrir todos los orderings
+# de licenses compuestos ("MIT OR Apache-2.0" vs "Apache-2.0 OR MIT").
 allow = [
     "MIT",
     "Apache-2.0",
@@ -43,6 +45,18 @@ highlight = "simplest-path"
 deny = [
     { crate = "openssl", use-instead = "aes-gcm", reason = "AegisQ usa exclusivamente RustCrypto. openssl introduce una FFI a C que rompe las garantías de seguridad de memoria." },
     { crate = "native-tls", use-instead = "rustls", reason = "Same rationale as openssl." },
+]
+
+# Duplicados transitivos inevitables — crates WASM de target-lexicon/wit-bindgen
+# que no controlamos y que se resuelven a versiones distintas por el grafo de deps.
+# Estos se eliminan cuando los crates upstream actualicen sus deps.
+skip = [
+    "cpufeatures@0.2.17",
+    "cpufeatures@0.3.0",
+    "crypto-common@0.1.7",
+    "crypto-common@0.2.2",
+    "wit-bindgen@0.51.0",
+    "wit-bindgen@0.57.1",
 ]
 
 # ── Advisories (CVEs) ──────────────────────────────────────────────────────────
