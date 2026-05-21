@@ -25,7 +25,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - `SessionExpiredError` — Nueva excepción para operaciones sobre sesiones cerradas.
 
 ### Changed
-- `rand_core` actualizado 0.6 → 0.10 (mejoras de seguridad y rendimiento).
+- `rand_core` eliminado; migrado a `getrandom` 0.4 (mejoras de seguridad y rendimiento).
 - `getrandom` actualizado 0.3 → 0.4 (mejor soporte para plataformas).
 - Classifier de PyPI: "Development Status :: 3 - Alpha" → "Development Status :: 4 - Beta".
 

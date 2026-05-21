@@ -22,9 +22,7 @@ pub enum AegisQError {
 
     /// Error al decodificar una llave publica desde Base64.
     ///
-    /// Se produce cuando el string provisto no es Base64 URL-safe valido
-    /// o cuando los bytes decodificados no tienen el tamano correcto
-    /// para el nivel de seguridad indicado.
+    /// Se produce cuando el string provisto no es Base64 URL-safe valido.
     Base64DecodeError(&'static str),
 }
 
