@@ -50,8 +50,9 @@ __all__ = [
 ]
 
 from importlib.metadata import version as _version
+from importlib.metadata import PackageNotFoundError
 
 try:
     __version__ = _version("aegisq-pqc")
-except Exception:  # paquete no instalado (ej: desarrollo local con maturin develop)
+except PackageNotFoundError:  # paquete no instalado (ej: desarrollo local con maturin develop)
     __version__ = "unknown"

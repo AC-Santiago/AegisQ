@@ -75,6 +75,14 @@ impl KeyPair {
             self.secret_key_bytes.len()
         )
     }
+
+    /// Serializa la clave publica a Base64 URL-safe sin padding.
+    ///
+    /// Returns:
+    ///     str: La clave publica en formato Base64 URL-safe sin padding `=`.
+    fn public_key_b64(&self) -> String {
+        aegisq_core::kem::public_key_to_b64(&self.public_key_bytes)
+    }
 }
 
 impl KeyPair {
