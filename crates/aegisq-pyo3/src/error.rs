@@ -77,5 +77,8 @@ pub fn core_error_to_pyerr(err: aegisq_core::error::AegisQError) -> PyErr {
         aegisq_core::error::AegisQError::DecryptionFailed => {
             DecryptionError::new_err("AES-GCM authentication tag verification failed")
         }
+        aegisq_core::error::AegisQError::Base64DecodeError(msg) => {
+            AegisQError::new_err(format!("base64 decode error: {}", msg))
+        }
     }
 }

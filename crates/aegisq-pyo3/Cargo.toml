@@ -2,6 +2,8 @@
 name    = "aegisq-pyo3"
 version = "1.1.0"
 edition = "2024"
+license = "MIT"
+publish = false
 
 [lib]
 name       = "_aegisq_core"
@@ -11,3 +13,4 @@ crate-type = ["cdylib"]
 # abi3-py311: genera un único wheel ABI3 compatible con Python 3.11+
 pyo3        = { version = "0.28", features = ["extension-module", "abi3-py311"] }
 aegisq-core = { path = "../aegisq-core" }
+base64      = { workspace = true }
