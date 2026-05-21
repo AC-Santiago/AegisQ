@@ -8,6 +8,7 @@ use crate::error::AegisQError;
 use crate::mlkem::decaps::ml_kem_decaps;
 use crate::mlkem::encaps::{ml_kem_encaps, ml_kem_encaps_deterministic};
 use crate::mlkem::keygen::{ml_kem_keygen, ml_kem_keygen_deterministic};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 
 /// Nivel de seguridad ML-KEM segun FIPS 203.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -214,4 +215,57 @@ pub fn encapsulate_deterministic(
         shared_secret,
         m: *m,
     })
+}
+
+// ── Serializacion de llaves publicas ─────────────────────────────────────
+
+/// Serializa una llave publica ML-KEM a Base64 URL-safe sin padding.
+///
+/// Produce un string seguro para usar en URLs, headers HTTP, bases de datos
+/// y cualquier contexto que requiera texto ASCII. El formato es Base64 URL-safe
+/// sin padding (`=`) segun RFC 4648 §5.
+///
+/// # Arguments
+/// - `public_key`: La llave publica como slice de bytes.
+///
+/// # Returns
+/// Un `String` con la representacion Base64 URL-safe sin padding de la llave.
+///
+/// # Note
+/// Solo la llave PUBLICA debe serializarse con esta funcion.
+/// La llave secreta NO debe exportarse sin cifrado de contrasena adicional.
+pub fn public_key_to_b64(public_key: &[u8]) -> alloc::string::String {
+    URL_SAFE_NO_PAD.encode(public_key)
+}
+
+/// Deserializa una llave publica ML-KEM desde Base64 URL-safe sin padding.
+///
+/// Acepta tanto Base64 con padding (`=`) como sin padding para maxima
+/// interoperabilidad, aunque el formato canonico de AegisQ es sin padding.
+///
+/// # Arguments
+/// - `b64`: El string Base64 URL-safe a decodificar.
+/// - `level`: El nivel de seguridad esperado. Se usa para validar que el tamano
+///   de los bytes decodificados corresponde a una llave publica valida.
+///
+/// # Errors
+/// - `AegisQError::Base64DecodeError` si el string no es Base64 valido.
+/// - `AegisQError::InvalidParameter` si el tamano de los bytes decodificados
+///   no corresponde al tamano de llave publica del nivel indicado.
+pub fn public_key_from_b64(
+    b64: &str,
+    level: SecurityLevel,
+) -> Result<alloc::vec::Vec<u8>, AegisQError> {
+    let bytes = URL_SAFE_NO_PAD
+        .decode(b64.trim_end_matches('='))
+        .map_err(|_| AegisQError::Base64DecodeError("invalid base64 URL-safe string"))?;
+
+    let expected = level.public_key_size();
+    if bytes.len() != expected {
+        return Err(AegisQError::InvalidParameter(
+            "decoded public key has incorrect size for the specified security level",
+        ));
+    }
+
+    Ok(bytes)
 }

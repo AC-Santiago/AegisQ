@@ -8,6 +8,7 @@ use pyo3::types::PyBytes;
 
 use crate::error::core_error_to_pyerr;
 use crate::types::{KeyPair, SecurityLevel};
+use aegisq_core::kem::{public_key_from_b64, public_key_to_b64};
 
 /// Resultado de encapsulacion determinista.
 #[allow(dead_code)]
@@ -209,6 +210,46 @@ pub fn encapsulate_deterministic<'py>(
             let m_bytes = PyBytes::new(py, &enc_result.m);
             Ok((capsule, shared_secret, m_bytes))
         }
+        Err(e) => Err(core_error_to_pyerr(e)),
+    }
+}
+
+// ── Serializacion Base64 de llaves publicas ────────────────────────────────
+
+/// Serializa una llave publica ML-KEM a Base64 URL-safe sin padding.
+///
+/// Args:
+///     public_key: La llave publica como bytes.
+///
+/// Returns:
+///     str: La llave publica en formato Base64 URL-safe sin padding.
+#[pyfunction]
+pub fn serialize_public_key(public_key: &[u8]) -> PyResult<String> {
+    Ok(public_key_to_b64(public_key))
+}
+
+/// Deserializa una llave publica ML-KEM desde Base64 URL-safe.
+///
+/// Args:
+///     b64 (str): El string Base64 URL-safe con la llave publica.
+///     level (SecurityLevel): El nivel de seguridad ML-KEM esperado.
+///
+/// Returns:
+///     bytes: Los bytes de la llave publica.
+///
+/// Raises:
+///     AegisQError: Si el string no es Base64 valido.
+///     InvalidParameterError: Si el tamano no coincide con el nivel.
+#[pyfunction]
+#[pyo3(signature = (b64, level=SecurityLevel::MlKem768))]
+pub fn deserialize_public_key<'py>(
+    py: Python<'py>,
+    b64: &str,
+    level: SecurityLevel,
+) -> PyResult<Bound<'py, PyBytes>> {
+    let core_level: aegisq_core::kem::SecurityLevel = level.into();
+    match public_key_from_b64(b64, core_level) {
+        Ok(bytes) => Ok(PyBytes::new(py, &bytes)),
         Err(e) => Err(core_error_to_pyerr(e)),
     }
 }

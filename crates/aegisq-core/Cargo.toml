@@ -2,6 +2,8 @@
 name    = "aegisq-core"
 version = "1.1.0"
 edition = "2024"
+license = "MIT"
+publish = false
 
 [dependencies]
 zeroize   = { workspace = true }
@@ -9,4 +11,5 @@ subtle    = { workspace = true }
 sha3      = { workspace = true }
 getrandom = { workspace = true }
 aes-gcm   = { workspace = true }
+base64    = { workspace = true }
 thiserror = { workspace = true }
