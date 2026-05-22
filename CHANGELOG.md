@@ -15,7 +15,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Added
 - **`deny.toml`** — Configuración de `cargo-deny` para auditoria continua de dependencias:
-  - Licencias permitidas (solo MIT)
+  - Lista explícita de licencias permitidas
   - Baneo de crates problemáticos (openssl, native-tls, unknown-registry)
   - Skip entries para dependencias WASM transitivas inevitables
 - **`MlKem.load_public_key_b64(b64, level=None)`** — Carga de llave pública desde string Base64 URL-safe
