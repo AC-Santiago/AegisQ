@@ -2,8 +2,8 @@
 **Post-Quantum Cryptography Engine — ML-KEM (FIPS 203) & AES-256-GCM Hybrid Implementation**
 
 > **Audience:** AI Code Assistants, Senior Cryptographic Engineers, Security Auditors
-> **Last Updated:** February 27, 2026
-> **Project Status:** Implementation Complete — All 25 phases passing tests
+> **Last Updated:** May 22, 2026
+> **Project Status:** Implementation Complete — All 29 phases passing tests
 
 ---
 
@@ -314,6 +314,11 @@ The project is divided into 25 strict phases. **Each phase must have passing tes
 | 23 | **Hybrid bridge tests (`test_hybrid_bindings.py`)** | — | ✅ Complete |
 | 24 | **AegisCipher end-to-end tests (`test_cipher_api.py`)** | — | ✅ Complete |
 | 25 | NIST KATs + ML-KEM integration tests | NIST vectors | ✅ Complete |
+| 26 | `.github/workflows/ci.yml` | CI/CD con GitHub Actions | ✅ Completo |
+| 27 | `tests/python/json-files/` | Vectores KAT NIST ACVP para ML-KEM | ✅ Completo |
+| 27b | `tests/python/test_kat_vectors.py` | Tests de verificación con KAT vectors | ✅ Completo |
+| 28 | `aegisq/session.py` | EphemeralSession con forward secrecy | ✅ Completo |
+| 29 | `aegisq/cipher.py` + `test_cipher_async.py` | Soporte async (encrypt_async/decrypt_async) | ✅ Completo |
 
 ---
 
@@ -365,6 +370,30 @@ capsule, shared_secret = kem.encapsulate(keypair.public_key)
 recovered = kem.decapsulate(capsule, keypair.secret_key)
 assert shared_secret == recovered
 ```
+
+#### Base64 Serialization
+
+ML-KEM public keys (800/1184/1568 bytes) can be serialized to URL-safe Base64
+without padding for transport as text strings:
+
+```python
+from aegisq import MlKem, SecurityLevel
+
+kem = MlKem(level=SecurityLevel.ML_KEM_768)
+keypair = kem.generate_keypair()
+
+# Serialize public key to Base64 URL-safe (no padding)
+b64 = keypair.public_key_b64()
+
+# Reload public key from Base64 string
+recovered = kem.load_public_key_b64(b64)
+assert recovered == keypair.public_key
+```
+
+This is useful for:
+- Transmitting keys via text-based protocols (HTTP headers, JSON payloads)
+- Storing keys in environment variables
+- Interoperability with NIST ACVP test vectors formats
 
 ### Rust Internal API (`aegisq-core`)
 
