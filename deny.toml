@@ -1,6 +1,7 @@
 # AegisQ — cargo-deny configuration
 # Docs: https://embarkstudios.github.io/cargo-deny/
-# Versión de cargo-deny usada: 0.18.4 (via EmbarkStudios/cargo-deny-action@v2.0.13)
+# La versión efectiva de cargo-deny depende de la versión de
+# EmbarkStudios/cargo-deny-action configurada en CI.
 
 # ── Licencias ──────────────────────────────────────────────────────────────────
 [licenses]
