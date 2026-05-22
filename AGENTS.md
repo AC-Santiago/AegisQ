@@ -4,7 +4,7 @@
 > Este documento es la fuente de verdad del proyecto. Cualquier decisión que contradiga
 > lo aquí escrito es incorrecta, sin importar cuánto "sentido" parezca tener en el momento.
 >
-> **Estado del Proyecto:** 29/29 fases completadas — v1.1.0 listo para release
+> **Estado del Proyecto:** 29/29 fases completadas — v1.2.0 listo para release
 
 ---
 
@@ -197,6 +197,7 @@ aegisq/                              ← Raíz del repositorio (workspace Cargo)
 │           └── hybrid-kem-dem.md
 │
 ├── CHANGELOG.md                     ← Registro de cambios
+├── deny.toml                    ← cargo-deny config (bans, licenses, sources)
 ├── SECURITY.md                      ← Política de seguridad
 ├── LICENSE                          ← MIT License
 ├── README.md                        ← Documentación general
@@ -221,8 +222,8 @@ resolver = "2"
 [workspace.dependencies]
 zeroize   = { version = "1.8",  features = ["derive", "zeroize_derive"] }
 subtle    = { version = "2.6",  default-features = false }
-sha3      = { version = "0.10", default-features = false }
-rand_core = { version = "0.6",  default-features = false, features = ["getrandom"] }
+sha3      = { version = "0.11", default-features = false }
+getrandom = { version = "0.4",  default-features = false }
 aes-gcm   = { version = "0.10", default-features = false, features = ["aes", "alloc"] }
 thiserror = { version = "2.0", default-features = false }
 
@@ -428,7 +429,34 @@ plaintext: bytes = cipher_bob.decrypt(
 )
 ```
 
----
+#### KeyPair Properties and Methods
+
+```python
+keypair.public_key   # bytes — clave pública ML-KEM (800/1184/1568 bytes según nivel)
+keypair.secret_key   # bytes — clave secreta (solo el receptor la tiene)
+keypair.level        # SecurityLevel — nivel de seguridad del keypair
+
+def public_key_b64(self) -> str:
+    """Serializa la clave pública a Base64 URL-safe (sin padding)."""
+```
+
+### 6.5 — Serialización Base64 URL-safe
+
+```python
+# Serializar clave pública a Base64 URL-safe (sin padding)
+b64 = keypair.public_key_b64()
+
+# Cargar clave pública desde Base64 URL-safe
+kem = MlKem(level=SecurityLevel.ML_KEM_768)
+public_key_bytes = kem.load_public_key_b64(b64)
+```
+
+La serialización Base64 permite transmitir claves públicas ML-KEM como strings
+texto (ej: en JSON, environment variables, headers HTTP) sin necesidad de
+transmitir los bytes raw de 800/1184/1568 bytes.
+
+El formato usado es URL-safe sin padding (RFC 4648 §5), compatible con el
+estándar NIST para intercambio de claves.
 
 ## 7. Comandos de Desarrollo
 
@@ -567,8 +595,8 @@ Cada fase debe tener sus tests pasando antes de avanzar a la siguiente.
 | PyPI package name | `aegisq-pqc` | Nombre para `pip install` |
 | Python import name | `aegisq` | Nombre para `import aegisq` |
 | Módulo interno | `aegisq._aegisq_core` | El `.so` compilado por Maturin |
-| Versión actual | `1.1.0` | Sincronizado con `pyproject.toml` |
-| Siguiente versión | `1.2.0` | Por definir según roadmap de features |
+| Versión actual | `1.2.0` | Sincronizado con `pyproject.toml` |
+| Siguiente versión | `1.3.0` | Por definir según roadmap de features |
 
 > ⚠️ **Nota:** No confundas el nombre del paquete PyPI (`aegisq-pqc`) con el nombre
 > del módulo Python (`aegisq`). Ambos son el mismo paquete; PyPI usa guiones
@@ -599,4 +627,4 @@ Cada fase debe tener sus tests pasando antes de avanzar a la siguiente.
 
 ---
 
-*Última actualización: v1.1.0 — Todas las fases completadas. 29/29. Listo para release.*
+*Última actualización: v1.2.0 — Todas las fases completadas. 29/29. Listo para release.*
