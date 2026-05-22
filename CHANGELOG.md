@@ -11,6 +11,34 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [1.2.0] - 2026-05-21
+
+### Added
+- **`deny.toml`** — Configuración de `cargo-deny` para auditoria continua de dependencias:
+  - Lista explícita de licencias permitidas
+  - Baneo de crates problemáticos (openssl, native-tls, unknown-registry)
+  - Skip entries para dependencias WASM transitivas inevitables
+- **`MlKem.load_public_key_b64(b64, level=None)`** — Carga de llave pública desde string Base64 URL-safe
+- **`KeyPair.public_key_b64()`** — Método que serializa la llave pública a Base64 URL-safe (sin padding)
+- Serialización Base64 URL-safe (RFC 4648 §5) para llaves públicas ML-KEM en los tres niveles de seguridad
+
+### Changed
+- **`cargo-audit`** → `actions-rust-lang/audit@v1` en CI (mejora rendimiento macOS)
+- **GitHub Actions** actualizadas:
+  - `actions/checkout`: v5 → v6
+  - `actions/upload-artifact`: v4 → v7
+  - `actions/download-artifact`: v4 → v8
+- **Dependencias Rust** actualizadas:
+  - `sha3`: 0.10 → 0.11
+  - `pyo3`: 0.28.2 → 0.28.3
+  - Dependencias transitivas menores actualizadas
+
+### Security
+- Auditoría de dependencias via `cargo-deny` en CI (bans, licenses, sources)
+- Configuración de `publish = false` y `license = "MIT"` explícitas en ambos crates Rust
+
+---
+
 ## [1.1.0] - 2026-04-29
 
 ### Added
@@ -74,6 +102,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 | `Fixed` | Corrección de bugs |
 | `Security` | Correcciones de seguridad o cambios relevantes para la seguridad |
 
-[Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/AC-Santiago/AegisQ/releases/tag/v1.0.0
