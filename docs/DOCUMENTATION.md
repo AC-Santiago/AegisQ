@@ -1,3 +1,6 @@
+> **⚠️ DEPRECATED**: This document is superseded by the [AegisQ Documentation Website](../website/src/content/docs/).
+> For technical documentation for AI agents and auditors, see `AGENTS.md`.
+
 # AegisQ: Complete Technical Documentation
 **Post-Quantum Cryptography Engine — ML-KEM (FIPS 203) & AES-256-GCM Hybrid Implementation**
 

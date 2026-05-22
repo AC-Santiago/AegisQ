@@ -1,0 +1,82 @@
+---
+title: Installation
+description: How to install AegisQ — from PyPI or from source with maturin.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+## From PyPI (Recommended)
+
+AegisQ is published on [PyPI](https://pypi.org/project/aegisq-pqc/) with pre-built wheels:
+
+<Tabs syncKey="installation">
+  <TabItem label="uv">
+```bash
+uv add aegisq-pqc
+```
+  </TabItem>
+  <TabItem label="pip">
+```bash
+pip install aegisq-pqc
+```
+  </TabItem>
+</Tabs>
+
+**Requirements:**
+- Python ≥ 3.11
+- No Rust toolchain needed — the PyPI package includes pre-compiled native extensions
+
+AegisQ uses the PyO3 **abi3 stable ABI**, which means a single wheel works across Python 3.11, 3.12, 3.13, and future versions without recompilation.
+
+## From Source (requires Rust toolchain)
+
+If you want to build from source (e.g., for development or auditing):
+
+
+<Tabs syncKey="installation">
+<TabItem label="uv">
+```bash
+# Clone and build
+git clone https://github.com/AC-Santiago/AegisQ.git
+cd aegisq
+
+uv sync --locked
+
+maturin develop --release
+```
+</TabItem>
+<TabItem label="pip">
+```bash
+# Clone and build
+git clone https://github.com/AC-Santiago/AegisQ.git
+cd aegisq
+
+pip install maturin
+
+maturin develop --release
+```
+</TabItem>
+
+</Tabs>
+
+
+
+### Development Build (debug, faster compilation)
+
+For development and testing, you can use a debug build which compiles faster:
+
+```bash
+maturin develop
+```
+
+## System Requirements
+
+| Requirement | Version |
+|-------------|---------|
+| Python | ≥ 3.11 |
+| Rust (source build only) | Latest stable via [rustup](https://rustup.rs/) |
+| OS | Linux, macOS, Windows |
+
+:::note
+AegisQ's native extension is built with PyO3's `abi3-py311` flag, targeting the Python Stable ABI. This ensures binary compatibility from Python 3.11 onwards without requiring per-version compilation.
+:::

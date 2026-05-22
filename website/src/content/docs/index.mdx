@@ -1,0 +1,44 @@
+---
+title: Welcome to AegisQ
+description: Post-Quantum Cryptography for Python — ML-KEM (FIPS 203) + AES-256-GCM
+template: splash
+hero:
+  title: AegisQ
+  tagline: Post-Quantum Cryptography for Python — ML-KEM (FIPS 203) + AES-256-GCM
+  actions:
+    - text: Get Started
+      link: /getting-started/installation/
+      icon: right-arrow
+      variant: primary
+    - text: View on PyPI
+      link: https://pypi.org/project/aegisq-pqc/
+      icon: external
+      variant: secondary
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Why AegisQ?
+
+AegisQ is a hybrid cryptographic library that combines **ML-KEM** (FIPS 203) for quantum-resistant key encapsulation with **AES-256-GCM** for authenticated symmetric encryption. The cryptographic core is written in Rust for performance and security guarantees, exposed to Python via PyO3.
+
+<CardGrid>
+  <Card title="Quantum-Safe" icon="shield">
+    ML-KEM (FIPS 203), resistant to Shor's algorithm. Your data stays secure even against future quantum computers.
+  </Card>
+  <Card title="Constant-Time" icon="approve-check-circle">
+    `subtle::ConstantTimeEq` with no secret-dependent branches. Immune to timing side-channel attacks.
+  </Card>
+  <Card title="Memory Zeroization" icon="warning">
+    `zeroize::Zeroize` on all structures containing secrets. Keys are securely erased after use.
+  </Card>
+  <Card title="Rust Core, Python API" icon="rocket">
+    Rust performance with Python ergonomics. Encrypt data securely in just 3 lines of code.
+  </Card>
+  <Card title="GIL Release" icon="forward-slash">
+    `py.detach()` for true parallelism during crypto operations. No GIL bottleneck.
+  </Card>
+  <Card title="Type-Safe" icon="document">
+    PEP 561 type stubs with full IDE autocompletion support. Catch errors before runtime.
+  </Card>
+</CardGrid>
