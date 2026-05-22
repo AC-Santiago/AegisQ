@@ -1,6 +1,6 @@
 # AegisQ
 
-**Post-Quantum Cryptography Engine for Python**
+**Post-Quantum Cryptography Engine for Python** · v1.2.0
 
 AegisQ is a hybrid cryptographic library that combines **ML-KEM** (FIPS 203) for quantum-resistant key encapsulation with **AES-256-GCM** for authenticated symmetric encryption. The cryptographic core is written in Rust for performance and security guarantees, exposed to Python via PyO3.
 
@@ -38,6 +38,14 @@ plaintext = cipher.decrypt(package, keypair.secret_key)
 
 ## Installation
 
+### From PyPI (recommended)
+
+```bash
+pip install aegisq-pqc
+```
+
+> **Python 3.11+ required.** The package supports Python 3.11 through 3.13+ via PyO3's stable ABI.
+
 ### From source (requires Rust toolchain)
 
 ```bash
@@ -45,15 +53,9 @@ plaintext = cipher.decrypt(package, keypair.secret_key)
 pip install maturin
 
 # Clone and build
-git clone <repository-url>
-cd aegisq
+git clone https://github.com/AC-Santiago/AegisQ.git
+cd AegisQ
 maturin develop --release
-```
-
-### Development build (debug, faster compilation)
-
-```bash
-maturin develop
 ```
 
 ---
@@ -108,6 +110,57 @@ recovered = kem.decapsulate(capsule, keypair.secret_key)
 assert shared_secret == recovered
 ```
 
+### Async Operations
+
+```python
+import asyncio
+from aegisq import AegisCipher, SecurityLevel
+
+async def main():
+    cipher = AegisCipher(level=SecurityLevel.ML_KEM_768)
+    keypair = cipher.generate_keypair()
+
+    # Non-blocking encryption
+    package = await cipher.encrypt_async(
+        b"Secret data",
+        keypair.public_key,
+    )
+
+    # Non-blocking decryption
+    plaintext = await cipher.decrypt_async(
+        package,
+        keypair.secret_key,
+    )
+    print(plaintext)  # b'Secret data'
+
+asyncio.run(main())
+```
+
+### Ephemeral Sessions (Forward Secrecy)
+
+The `EphemeralSession` class generates a keypair internally and destroys the secret key when the session closes, providing **forward secrecy**:
+
+```python
+from aegisq import EphemeralSession
+
+# Receiver creates an ephemeral session (secret key never leaves this context)
+with EphemeralSession() as receiver:
+    public_key = receiver.public_key  # Share this with the sender
+
+    # Sender encrypts using the receiver's public key
+    sender_cipher = EphemeralSession()
+    package = sender_cipher.encrypt(
+        b"Secret data",
+        recipient_public_key=public_key,
+    )
+    sender_cipher.close()
+
+    # Receiver decrypts
+    plaintext = receiver.decrypt(package)
+
+# Session closes, secret key is destroyed
+```
+
 ---
 
 ## Security Levels
@@ -156,6 +209,18 @@ class MlKem:
     def generate_keypair(self) -> KeyPair
     def encapsulate(self, public_key: bytes) -> tuple[bytes, bytes]
     def decapsulate(self, capsule: bytes, secret_key: bytes) -> bytes
+    def load_public_key_b64(self, b64: str, level: SecurityLevel = None) -> bytes
+```
+
+#### Base64 Serialization
+
+```python
+# Serialize public key to Base64 URL-safe (no padding)
+b64 = keypair.public_key_b64()
+
+# Load public key from Base64 URL-safe string
+kem = MlKem(level=SecurityLevel.ML_KEM_768)
+public_key_bytes = kem.load_public_key_b64(b64)
 ```
 
 ### `KeyPair`
@@ -279,14 +344,14 @@ ruff check aegisq/                        # Python type checking
 
 ### Dependencies
 
-| Crate | Purpose |
-|-------|---------|
-| `aes-gcm` 0.10 | AES-256-GCM authenticated encryption (no_std, hardware AES-NI) |
-| `sha3` 0.10 | SHAKE-128/256 and SHA3-256/512 for ML-KEM (no_std) |
-| `zeroize` 1.8 | Secure memory erasure of secrets |
-| `subtle` 2.6 | Constant-time comparisons |
-| `rand_core` 0.6 | OS-level CSPRNG via `OsRng` (no_std) |
-| `pyo3` 0.28 | Rust-Python FFI bindings (abi3-py311) |
+| Crate | Version | Purpose |
+|-------|---------|---------|
+| `aes-gcm` | 0.10 | AES-256-GCM authenticated encryption (no_std, hardware AES-NI) |
+| `sha3` | 0.11 | SHAKE-128/256 and SHA3-256/512 for ML-KEM (no_std) |
+| `zeroize` | 1.8 | Secure memory erasure of secrets |
+| `subtle` | 2.6 | Constant-time comparisons |
+| `getrandom` | 0.4 | Cross-platform CSPRNG (no_std) |
+| `pyo3` | 0.28 | Rust-Python FFI bindings (abi3-py311) |
 
 ---
 
