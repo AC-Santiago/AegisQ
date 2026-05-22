@@ -19,7 +19,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - Baneo de crates problemáticos (openssl, native-tls, unknown-registry)
   - Skip entries para dependencias WASM transitivas inevitables
 - **`MlKem.load_public_key_b64(b64, level=None)`** — Carga de llave pública desde string Base64 URL-safe
-- **`KeyPair.public_key_b64`** — Propiedad que serializa la llave pública a Base64 URL-safe (sin padding)
+- **`KeyPair.public_key_b64()`** — Método que serializa la llave pública a Base64 URL-safe (sin padding)
 - Serialización Base64 URL-safe (RFC 4648 §5) para llaves públicas ML-KEM en los tres niveles de seguridad
 
 ### Changed
