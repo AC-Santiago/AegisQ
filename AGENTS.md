@@ -202,7 +202,7 @@ aegisq/                              ← Raíz del repositorio (workspace Cargo)
 ├── LICENSE                          ← MIT License
 ├── README.md                        ← Documentación general
 ├── docs/
-│   └── DOCUMENTATION.md             ← Documentación técnica detallada
+│   └── DOCUMENTATION.md  ← DEPRECATED → see website/
 └── .python-version                  ← Versión de Python requerida (3.11+)
 ```
 
