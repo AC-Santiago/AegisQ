@@ -5,6 +5,7 @@ y que los errores de formato y tamano se propagan correctamente.
 """
 
 import base64 as _b64_stdlib
+import math
 
 import pytest
 
@@ -45,25 +46,22 @@ class TestPublicKeyB64RoundTrip:
         assert "/" not in b64, "Base64 URL-safe no debe contener '/'"
 
     @pytest.mark.parametrize(
-        "level",
+        "level, expected_pk_size",
         [
-            SecurityLevel.ML_KEM_512,
-            SecurityLevel.ML_KEM_768,
-            SecurityLevel.ML_KEM_1024,
+            (SecurityLevel.ML_KEM_512, 800),
+            (SecurityLevel.ML_KEM_768, 1184),
+            (SecurityLevel.ML_KEM_1024, 1568),
         ],
     )
-    def test_b64_length_is_correct(self, level: SecurityLevel) -> None:
+    def test_b64_length_is_correct(
+        self, level: SecurityLevel, expected_pk_size: int
+    ) -> None:
         """El string Base64 debe tener la longitud correcta para el nivel."""
-        expected_key_sizes = {
-            SecurityLevel.ML_KEM_512: 800,
-            SecurityLevel.ML_KEM_768: 1184,
-            SecurityLevel.ML_KEM_1024: 1568,
-        }
+        # Se parametriza el tamano esperado en lugar de usar un dict con
+        # SecurityLevel como key, porque SecurityLevel (PyO3 #[pyclass]
+        # con eq_int) no es hashable como dict key de Python.
         # Base64 sin padding: ceil(n * 4 / 3) caracteres
-        import math
-
-        n = expected_key_sizes[level]
-        expected_b64_len = math.ceil(n * 4 / 3)
+        expected_b64_len = math.ceil(expected_pk_size * 4 / 3)
 
         kem = MlKem(level=level)
         keypair = kem.generate_keypair()
