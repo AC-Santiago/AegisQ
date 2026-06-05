@@ -49,10 +49,12 @@ __all__ = [
     "SessionExpiredError",
 ]
 
-from importlib.metadata import version as _version
 from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _version
 
 try:
     __version__ = _version("aegisq-pqc")
-except PackageNotFoundError:  # paquete no instalado (ej: desarrollo local con maturin develop)
+except (
+    PackageNotFoundError
+):  # paquete no instalado (ej: desarrollo local con maturin develop)
     __version__ = "unknown"
