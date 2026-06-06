@@ -256,6 +256,10 @@ pub fn public_key_from_b64(
     b64: &str,
     level: SecurityLevel,
 ) -> Result<alloc::vec::Vec<u8>, AegisQError> {
+    // Trim surrounding whitespace (e.g., trailing `\n` from env vars or files)
+    // before decoding. Only `=` padding was being stripped before, which caused
+    // spurious decode failures on otherwise-valid Base64.
+    let b64 = b64.trim();
     let bytes = URL_SAFE_NO_PAD
         .decode(b64.trim_end_matches('='))
         .map_err(|_| AegisQError::Base64DecodeError("invalid base64 URL-safe string"))?;
@@ -268,4 +272,29 @@ pub fn public_key_from_b64(
     }
 
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::format;
+
+    /// `public_key_from_b64` must accept strings with surrounding whitespace
+    /// (e.g. trailing `\n` from env vars or files) and still decode them to
+    /// the original public key bytes.
+    #[test]
+    fn public_key_from_b64_trims_whitespace() {
+        // Generate a real ML-KEM-768 keypair to get a valid 1184-byte public key
+        let keypair = generate_keypair(SecurityLevel::MlKem768).unwrap();
+        let pk_b64 = public_key_to_b64(&keypair.public_key);
+
+        // Wrap the canonical Base64 with the kinds of whitespace that appear
+        // when reading from env vars or trailing-newline-terminated files.
+        let with_whitespace = format!("\n  {}\t\n", pk_b64);
+
+        // The decode must succeed and yield exactly the original bytes.
+        let decoded = public_key_from_b64(&with_whitespace, SecurityLevel::MlKem768)
+            .expect("decode should succeed with surrounding whitespace");
+        assert_eq!(decoded, keypair.public_key);
+    }
 }
