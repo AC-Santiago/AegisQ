@@ -55,7 +55,7 @@ jobs:
         run: cargo install --locked cargo-audit
 
       - name: Audit dependencies
-        uses: actions-rust-lang/audit@v1
+        run: cargo audit
 
   # ── Job 2: Python — build, test, lint ──────────────────────────────
   test-python:
