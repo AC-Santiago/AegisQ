@@ -108,7 +108,7 @@ class MlKem:
         return bytes(_decapsulate(capsule, secret_key, self._level))
 
     def load_public_key_b64(
-        self, b64: str, level: Optional[SecurityLevel] = None
+        self, b64: str, level: SecurityLevel | None = None
     ) -> bytes:
         """Carga una llave publica desde su representacion Base64 URL-safe.
 
