@@ -30,7 +30,6 @@ name = "aegisq-pyo3"
 version = "1.2.0"
 dependencies = [
  "aegisq-core",
- "base64",
  "pyo3",
 ]
 
