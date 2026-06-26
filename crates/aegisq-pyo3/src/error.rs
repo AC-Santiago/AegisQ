@@ -44,6 +44,12 @@ create_exception!(
     AegisQError,
     "CSPRNG not available from the operating system."
 );
+create_exception!(
+    aegisq,
+    KeySerializationError,
+    AegisQError,
+    "Invalid key serialization format (PEM header, JSON, magic bytes, truncated blob)."
+);
 
 /// Registra las excepciones customizadas en el modulo Python.
 pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -58,6 +64,10 @@ pub fn register_exceptions(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.py().get_type::<InvalidParameterError>(),
     )?;
     m.add("RngError", m.py().get_type::<RngError>())?;
+    m.add(
+        "KeySerializationError",
+        m.py().get_type::<KeySerializationError>(),
+    )?;
     Ok(())
 }
 
@@ -79,6 +89,9 @@ pub fn core_error_to_pyerr(err: aegisq_core::error::AegisQError) -> PyErr {
         }
         aegisq_core::error::AegisQError::Base64DecodeError(msg) => {
             AegisQError::new_err(format!("base64 decode error: {}", msg))
+        }
+        aegisq_core::error::AegisQError::KeySerializationError(msg) => {
+            KeySerializationError::new_err(msg.to_string())
         }
     }
 }

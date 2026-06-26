@@ -13,3 +13,5 @@ crate-type = ["cdylib"]
 # abi3-py311: genera un único wheel ABI3 compatible con Python 3.11+
 pyo3        = { version = "0.28", features = ["extension-module", "abi3-py311"] }
 aegisq-core = { path = "../aegisq-core" }
+getrandom   = { workspace = true }
+base64      = { workspace = true }
