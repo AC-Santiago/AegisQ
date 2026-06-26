@@ -12,5 +12,7 @@ extern crate alloc;
 
 pub mod error;
 pub mod hybrid;
+pub mod kdf;
 pub mod kem;
+pub mod key_wrap;
 pub mod mlkem;
