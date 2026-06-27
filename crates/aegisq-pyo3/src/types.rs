@@ -8,8 +8,8 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use pyo3::prelude::*;
 use pyo3::types::PyBytes;
 
-use aegisq_core::key_wrap;
 use aegisq_core::kem::SecurityLevel as CoreSecurityLevel;
+use aegisq_core::key_wrap;
 
 use crate::error::core_error_to_pyerr;
 
@@ -173,11 +173,7 @@ impl KeyPair {
     ///
     /// Returns:
     ///     str: La clave privada cifrada como PEM.
-    fn export_secret_key_pem<'py>(
-        &self,
-        py: Python<'py>,
-        password: &[u8],
-    ) -> PyResult<String> {
+    fn export_secret_key_pem<'py>(&self, py: Python<'py>, password: &[u8]) -> PyResult<String> {
         let blob = py
             .detach(|| self.wrap_secret_key_blob(password))
             .map_err(core_error_to_pyerr)?;
@@ -205,7 +201,10 @@ impl KeyPair {
     ///
     /// Genera salt y nonce con `getrandom`, luego delega a `aegisq_core::key_wrap`.
     /// Esta funcion NO toca el GIL — el caller debe usar `py.detach(...)`.
-    fn wrap_secret_key_blob(&self, password: &[u8]) -> Result<alloc::vec::Vec<u8>, aegisq_core::error::AegisQError> {
+    fn wrap_secret_key_blob(
+        &self,
+        password: &[u8],
+    ) -> Result<alloc::vec::Vec<u8>, aegisq_core::error::AegisQError> {
         let core_level: CoreSecurityLevel = self.level.into();
 
         // Generar salt + nonce en Capa 2 (NO en Capa 1 — se mantiene pura).
