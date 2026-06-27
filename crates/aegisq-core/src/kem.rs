@@ -298,3 +298,95 @@ mod tests {
         assert_eq!(decoded, keypair.public_key);
     }
 }
+
+// ── Validacion de tamano de llaves (v1.3.0) ─────────────────────────────
+
+/// Valida que los bytes corresponden al tamano esperado de una llave publica para el nivel dado.
+///
+/// # Errors
+/// - `AegisQError::InvalidParameter` si el tamano no coincide.
+pub fn validate_public_key_size(pk: &[u8], level: SecurityLevel) -> Result<(), AegisQError> {
+    let expected = level.public_key_size();
+    if pk.len() != expected {
+        return Err(AegisQError::InvalidParameter(
+            "public key size does not match the specified security level",
+        ));
+    }
+    Ok(())
+}
+
+/// Valida que los bytes corresponden al tamano esperado de una llave secreta para el nivel dado.
+///
+/// # Errors
+/// - `AegisQError::InvalidParameter` si el tamano no coincide.
+pub fn validate_secret_key_size(sk: &[u8], level: SecurityLevel) -> Result<(), AegisQError> {
+    let expected = level.secret_key_size();
+    if sk.len() != expected {
+        return Err(AegisQError::InvalidParameter(
+            "secret key size does not match the specified security level",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+
+    #[test]
+    fn validate_public_key_size_accepts_correct_sizes() {
+        for level in [
+            SecurityLevel::MlKem512,
+            SecurityLevel::MlKem768,
+            SecurityLevel::MlKem1024,
+        ] {
+            let pk = alloc::vec![0u8; level.public_key_size()];
+            assert!(
+                validate_public_key_size(&pk, level).is_ok(),
+                "valid size for {level:?} must be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_public_key_size_rejects_wrong_sizes() {
+        let pk = alloc::vec![0u8; 100];
+        assert!(matches!(
+            validate_public_key_size(&pk, SecurityLevel::MlKem768),
+            Err(AegisQError::InvalidParameter(_))
+        ));
+    }
+
+    #[test]
+    fn validate_public_key_size_rejects_empty() {
+        let pk: &[u8] = &[];
+        assert!(matches!(
+            validate_public_key_size(pk, SecurityLevel::MlKem768),
+            Err(AegisQError::InvalidParameter(_))
+        ));
+    }
+
+    #[test]
+    fn validate_secret_key_size_accepts_correct_sizes() {
+        for level in [
+            SecurityLevel::MlKem512,
+            SecurityLevel::MlKem768,
+            SecurityLevel::MlKem1024,
+        ] {
+            let sk = alloc::vec![0u8; level.secret_key_size()];
+            assert!(
+                validate_secret_key_size(&sk, level).is_ok(),
+                "valid size for {level:?} must be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn validate_secret_key_size_rejects_wrong_sizes() {
+        let sk = alloc::vec![0u8; 100];
+        assert!(matches!(
+            validate_secret_key_size(&sk, SecurityLevel::MlKem768),
+            Err(AegisQError::InvalidParameter(_))
+        ));
+    }
+}

@@ -29,10 +29,20 @@ from aegisq.exceptions import (
     DecapsulationError,
     DecryptionError,
     InvalidParameterError,
+    KeySerializationError,
     RngError,
     SessionExpiredError,
 )
 from aegisq.kem import MlKem
+from aegisq.keys import (
+    load_public_key,
+    load_secret_key,
+    public_key_to_json,
+    public_key_to_pem,
+    save_public_key,
+    save_secret_key,
+    secret_key_to_pem,
+)
 from aegisq.session import EphemeralSession
 
 __all__ = [
@@ -45,8 +55,16 @@ __all__ = [
     "DecapsulationError",
     "DecryptionError",
     "InvalidParameterError",
+    "KeySerializationError",
     "RngError",
     "SessionExpiredError",
+    "load_public_key",
+    "load_secret_key",
+    "public_key_to_json",
+    "public_key_to_pem",
+    "save_public_key",
+    "save_secret_key",
+    "secret_key_to_pem",
 ]
 
 from importlib.metadata import PackageNotFoundError

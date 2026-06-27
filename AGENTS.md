@@ -546,6 +546,8 @@ Cada fase debe tener sus tests pasando antes de avanzar a la siguiente.
 | 27b  | `tests/python/test_kat_vectors.py`       | Tests de verificación con KAT vectors                | ✅ Completo |
 | 28   | `aegisq/session.py`                      | EphemeralSession con forward secrecy                | ✅ Completo |
 | 29   | `aegisq/cipher.py` + `test_cipher_async.py` | Soporte async (encrypt_async/decrypt_async)       | ✅ Completo |
+| 30   | `crates/aegisq-core/src/kdf.rs` + `key_wrap.rs` + `kem.rs` (validate_*) | HKDF/HMAC-SHA3-256 + cifrado de secret_key (v1.3.0) | ✅ v1.3.0 |
+| 31   | `crates/aegisq-pyo3/src/types.rs` + `key_io_bindings.rs` + `aegisq/keys.py` + `deny.toml` | Serializacion PEM/JSON/encrypted + cargo-deny gate (v1.3.0) | ✅ v1.3.0 |
 
 ---
 
