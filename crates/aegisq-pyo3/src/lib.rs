@@ -12,6 +12,7 @@ use pyo3::prelude::*;
 mod error;
 mod hybrid_bindings;
 mod kem_bindings;
+mod key_io_bindings;
 mod types;
 
 /// Modulo Python `_aegisq_core`.
@@ -48,6 +49,12 @@ fn _aegisq_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Registrar funciones hibridas
     m.add_function(wrap_pyfunction!(hybrid_bindings::encrypt_hybrid, m)?)?;
     m.add_function(wrap_pyfunction!(hybrid_bindings::decrypt_hybrid, m)?)?;
+
+    // Registrar funciones de carga/serializacion de llaves (v1.3.0)
+    m.add_function(wrap_pyfunction!(key_io_bindings::load_public_key_pem, m)?)?;
+    m.add_function(wrap_pyfunction!(key_io_bindings::load_public_key_json, m)?)?;
+    m.add_function(wrap_pyfunction!(key_io_bindings::load_secret_key_raw, m)?)?;
+    m.add_function(wrap_pyfunction!(key_io_bindings::load_secret_key_pem, m)?)?;
 
     Ok(())
 }

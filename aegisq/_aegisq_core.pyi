@@ -26,6 +26,11 @@ class InvalidParameterError(AegisQError, ValueError):
 
     ...
 
+class KeySerializationError(AegisQError):
+    """Invalid key serialization format (PEM header, JSON, magic bytes)."""
+
+    ...
+
 class RngError(AegisQError):
     """CSPRNG not available from the operating system."""
 
@@ -62,6 +67,26 @@ class KeyPair:
 
     def public_key_b64(self) -> str:
         """Retorna la clave publica como Base64 URL-safe sin padding."""
+        ...
+
+    def public_key_pem(self) -> str:
+        """Retorna la clave publica en formato PEM-like ML-KEM."""
+        ...
+
+    def public_key_json(self) -> str:
+        """Retorna la clave publica en formato JSON."""
+        ...
+
+    def export_secret_key_raw(self, password: bytes) -> bytes:
+        """Retorna la clave secreta cifrada como blob binario opaco.
+
+        Usa AES-256-GCM con clave derivada de ``password`` via HKDF-SHA3-256.
+        Libera el GIL durante HKDF + AES-GCM.
+        """
+        ...
+
+    def export_secret_key_pem(self, password: bytes) -> str:
+        """Retorna la clave secreta cifrada en formato PEM-like ENCRYPTED."""
         ...
 
 # --- Funciones KEM ---
@@ -160,4 +185,56 @@ def decrypt_hybrid(
     level: SecurityLevel = SecurityLevel.ML_KEM_768,
 ) -> bytes:
     """Descifra un Transit Package."""
+    ...
+
+# --- Serializacion / carga de llaves (v1.3.0) ---
+
+def load_public_key_pem(
+    pem: str,
+    level: SecurityLevel = SecurityLevel.ML_KEM_768,
+) -> bytes:
+    """Carga una llave publica desde formato PEM-like ML-KEM.
+
+    Raises:
+        KeySerializationError: Si el PEM no tiene header/footer o Base64 invalido.
+        InvalidParameterError: Si el tamano no coincide con el nivel.
+    """
+    ...
+
+def load_public_key_json(json: str) -> tuple[bytes, SecurityLevel]:
+    """Carga una llave publica desde JSON.
+
+    El JSON debe tener los campos ``algorithm``, ``level`` y ``public_key``.
+
+    Returns:
+        Tupla ``(public_key_bytes, level)``.
+
+    Raises:
+        KeySerializationError: Si el JSON esta malformado o le faltan campos.
+        InvalidParameterError: Si el tamano no coincide con el nivel declarado.
+    """
+    ...
+
+def load_secret_key_raw(
+    blob: bytes,
+    password: bytes,
+) -> tuple[bytes, SecurityLevel]:
+    """Descifra y retorna la llave secreta desde un blob binario.
+
+    Raises:
+        DecryptionError: Si la contrasena es incorrecta o el blob esta corrupto.
+        KeySerializationError: Si magic/version son invalidos o el blob esta truncado.
+    """
+    ...
+
+def load_secret_key_pem(
+    pem: str,
+    password: bytes,
+) -> tuple[bytes, SecurityLevel]:
+    """Descifra y retorna la llave secreta desde un PEM-like ENCRYPTED.
+
+    Raises:
+        DecryptionError: Si la contrasena es incorrecta o el blob esta corrupto.
+        KeySerializationError: Si el PEM/Base64/magic son invalidos.
+    """
     ...

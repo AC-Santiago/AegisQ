@@ -44,3 +44,7 @@ Thumbs.db
 .opencode/
 opencode.json
 .atl/
+.pi/
+
+# Private v1.3.0 specs document (used as plan, not part of the codebase)
+aegisq_v1_3_0_specs.md

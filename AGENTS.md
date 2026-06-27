@@ -546,6 +546,8 @@ Cada fase debe tener sus tests pasando antes de avanzar a la siguiente.
 | 27b  | `tests/python/test_kat_vectors.py`       | Tests de verificación con KAT vectors                | ✅ Completo |
 | 28   | `aegisq/session.py`                      | EphemeralSession con forward secrecy                | ✅ Completo |
 | 29   | `aegisq/cipher.py` + `test_cipher_async.py` | Soporte async (encrypt_async/decrypt_async)       | ✅ Completo |
+| 30   | `crates/aegisq-core/src/kdf.rs` + `key_wrap.rs` + `kem.rs` (validate_*) | HKDF/HMAC-SHA3-256 + cifrado de secret_key (v1.3.0) | ✅ v1.3.0 |
+| 31   | `crates/aegisq-pyo3/src/types.rs` + `key_io_bindings.rs` + `aegisq/keys.py` + `deny.toml` | Serializacion PEM/JSON/encrypted + cargo-deny gate (v1.3.0) | ✅ v1.3.0 |
 
 ---
 
@@ -588,7 +590,139 @@ Cada fase debe tener sus tests pasando antes de avanzar a la siguiente.
 
 ---
 
-## 12. Nomenclatura de Paquete y Versionado
+## 12. Workflow de Ramificación (GitFlow)
+
+Este proyecto sigue **GitFlow**. La rama `main` siempre contiene la última
+versión estable publicada en PyPI. La rama `develop` contiene el trabajo en
+curso para el próximo release. **Ningún commit directo** a `main` o `develop`
+— todo cambio entra vía Pull Request y se mergea con **squash**.
+
+### 12.1 Tabla de creación de ramas
+
+| Si vas a... | Creá rama desde | Con prefijo | Y abrí PR contra |
+|-------------|-----------------|-------------|------------------|
+| Agregar feature | `develop` | `feature/<nombre-kebab-corto>` | `develop` |
+| Arreglar un bug | `develop` | `fix/<descripcion-corta>` | `develop` |
+| Mantenimiento (deps, configs) | `develop` | `chore/<que-cambia>` | `develop` |
+| Solo documentación | `develop` | `docs/<que-documenta>` | `develop` |
+| Refactor sin cambio funcional | `develop` | `refactor/<que-mejora>` | `develop` |
+| Tests sin cambio de prod | `develop` | `test/<que-cubre>` | `develop` |
+| Preparar un release | `develop` | `release/vX.Y.Z` | `main` |
+| Hotfix URGENTE en producción | `main` (en el tag) | `hotfix/vX.Y.Z+1` | `main` |
+
+**Reglas de naming**:
+- Usá kebab-case (guiones), no snake_case ni camelCase
+- Sé descriptivo pero conciso: `fix/nonce-reuse-on-retry` ✓, `fix/bug` ✗
+- Referenciá el issue si existe: `fix/issue-123-public-key-validation`
+
+### 12.2 Reglas de merge (en GitHub)
+
+- ✅ **SIEMPRE** "Squash and merge" — un commit limpio por feature/fix
+- ❌ **NUNCA** "Create a merge commit" — contamina la historia
+- ❌ **NUNCA** "Rebase and merge" — pierde la atribución de commits
+- Mensaje del squash: mantener el del PR (Conventional Commit)
+
+### 12.3 Conventional Commits (tipos válidos)
+
+El mensaje del commit y del PR debe seguir [Conventional Commits 1.0.0](https://www.conventionalcommits.org/):
+
+| Tipo | Cuándo | Ejemplo |
+|------|--------|---------|
+| `feat` | Nueva feature | `feat(cipher): add streaming API for large files` |
+| `fix` | Bug fix | `fix(hybrid): prevent nonce reuse on retry` |
+| `docs` | Solo documentación | `docs(readme): clarify Python 3.12 install` |
+| `style` | Formato sin cambio lógico | `style(kem): apply ruff format` |
+| `refactor` | Refactor sin cambio funcional | `refactor(error): unify AegisQError variants` |
+| `perf` | Mejora de performance | `perf(ntt): cache precomputed zetas` |
+| `test` | Solo tests | `test(kat): add v1.2.0 official vectors` |
+| `chore` | Mantenimiento general | `chore(deps): bump sha3 to 0.12` |
+| `ci` | CI/CD | `ci(workflow): add dependabot weekly schedule` |
+| `build` | Build system | `build(maturin): enable abi3-py312` |
+| `revert` | Revertir cambio | `revert: feat(cipher) streaming due to regression` |
+
+**Breaking changes**: marcar con `!` después del tipo o en el footer:
+```
+feat(cipher)!: change encrypt() return type
+
+BREAKING CHANGE: callers must now use .ciphertext property
+```
+
+### 12.4 Release flow completo
+
+```
+ develop                          main (tag v1.2.0)
+   │                                │
+   ├── feature/horizonte-1 ───┐    │
+   ├── fix/nist-compliance ───┤    │
+   └── chore/bump-deps ───────┤    │
+                              │    │
+                              ▼    │
+                       release/v1.3.0  (bump version, CHANGELOG, fix de últimos bugs)
+                              │    │
+                              ├── PR squash ──► main (tag v1.3.0, auto-publish PyPI)
+                              │    │
+                              └── PR squash ──► develop (sync post-release)
+```
+
+**Pasos detallados**:
+
+1. Cuando `develop` madura y está listo para release, cortar rama:
+   ```bash
+   git checkout develop && git pull
+   git checkout -b release/v1.3.0
+   ```
+
+2. En `release/v1.3.0`:
+   - Bump version en `pyproject.toml` y `Cargo.toml`
+   - Actualizar `CHANGELOG.md`
+   - Fix de últimos bugs (cualquier cambio va en ESTA rama, no en `develop`)
+
+3. PR `release/v1.3.0` → `main` (squash merge). El merge activa el tag `vX.Y.Z` y la publicación automática a PyPI vía `release.yml`.
+
+4. **Inmediatamente después**: PR de sync `main` → `develop` (squash merge).
+
+5. (Opcional) Eliminar rama `release/v1.3.0` local y remoto. El tag `vX.Y.Z` queda en `main`.
+
+### 12.5 Post-release checklist
+
+Después de mergear un release a `main`, en orden:
+
+- [ ] Tag `vX.Y.Z` pusheado a `origin`
+- [ ] PyPI publicó correctamente (verificar via `pip install aegisq-pqc==vX.Y.Z`)
+- [ ] PR de sync a `develop` abierto y mergeado
+- [ ] `git diff main origin/develop --shortstat` está **VACÍO** (sin diff)
+- [ ] GitHub Release creado con notas extraídas del `CHANGELOG.md`
+- [ ] Rama `release/vX.Y.Z` eliminada (opcional)
+
+### 12.6 Hotfix flow (urgencias en producción)
+
+Si se descubre un bug crítico en `v1.2.0` (ya publicado en PyPI):
+
+1. Cortar hotfix desde el tag `v1.2.0` en `main`:
+   ```bash
+   git checkout main && git pull
+   git checkout v1.2.0  # el tag, no main
+   git checkout -b hotfix/v1.2.1
+   ```
+
+2. Aplicar el fix MÍNIMO necesario.
+
+3. PR `hotfix/v1.2.1` → `main` (squash merge). El merge activa el tag `v1.2.1` y la publicación a PyPI.
+
+4. **Crítico**: PR `hotfix/v1.2.1` → `develop` también, para que el fix se incluya en `v1.3.0`.
+
+### 12.7 Reglas de protección de rama (recordatorio)
+
+Las reglas en GitHub prohíben explícitamente:
+- ❌ Force-push a `main` o `develop` (preservar historia)
+- ❌ Merge commits directos (mantener historia lineal)
+- ❌ Commits directos sin PR (forzar revisión)
+
+Si ves "Repository rule violations found" en un push, NO intentes forzar — significa que estás rompiendo el flujo. Volvé atrás y usá el patrón correcto (PR con squash).
+
+---
+
+## 13. Nomenclatura de Paquete y Versionado
 
 | Atributo | Valor | Notas |
 |----------|-------|-------|
@@ -612,7 +746,7 @@ Cada fase debe tener sus tests pasando antes de avanzar a la siguiente.
 
 ---
 
-## 13. Referencias Normativas
+## 14. Referencias Normativas
 
 | Documento | URL |
 |-----------|-----|
@@ -624,7 +758,9 @@ Cada fase debe tener sus tests pasando antes de avanzar a la siguiente.
 | zeroize crate | https://docs.rs/zeroize |
 | subtle crate | https://docs.rs/subtle |
 | NIST SP 800-38D (AES-GCM spec) | https://csrc.nist.gov/pubs/sp/800/38/d/final |
+| Conventional Commits 1.0.0 | https://www.conventionalcommits.org/ |
+| GitFlow (Vincent Driessen, 2010) | https://nvie.com/posts/a-successful-git-branching-model/ |
 
 ---
 
-*Última actualización: v1.2.0 — Todas las fases completadas. 29/29. Listo para release.*
+*Última actualización: v1.2.0 + docs/gitflow-workflow — 30/29 secciones (incorpora workflow de ramificación formal). Listo para release.*

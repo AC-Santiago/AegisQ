@@ -18,6 +18,7 @@ from aegisq._aegisq_core import (
     DecapsulationError,
     DecryptionError,
     InvalidParameterError,
+    KeySerializationError,
     RngError,
 )
 
@@ -26,6 +27,7 @@ __all__ = [
     "DecapsulationError",
     "DecryptionError",
     "InvalidParameterError",
+    "KeySerializationError",
     "RngError",
     "SessionExpiredError",
 ]

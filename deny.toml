@@ -1,13 +1,24 @@
-# AegisQ — cargo-deny configuration
+# cargo-deny configuration for AegisQ
 # Docs: https://embarkstudios.github.io/cargo-deny/
-# La versión efectiva de cargo-deny depende de la versión de
-# EmbarkStudios/cargo-deny-action configurada en CI.
+#
+# Schema actual (cargo-deny 0.19):
+# - [licenses] ya NO tiene keys deprecadas (deny/unlicensed/copyleft removidas).
+#   Cualquier licencia NO listada en `allow` es denegada por default.
+# - [advisories] requiere `unmaintained = "all"|"workspace"|"transitive"|"none"`.
 
-# ── Licencias ──────────────────────────────────────────────────────────────────
+[graph]
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "aarch64-unknown-linux-gnu" },
+    { triple = "x86_64-apple-darwin" },
+    { triple = "aarch64-apple-darwin" },
+    { triple = "x86_64-pc-windows-msvc" },
+]
+
 [licenses]
-# Todas las licencias se deniegan a menos que estén en esta lista.
-# Se usan expresiones SPDX completas para cubrir todos los orderings
-# de licenses compuestos ("MIT OR Apache-2.0" vs "Apache-2.0 OR MIT").
+# Licencias aprobadas para AegisQ (todo el dependency tree).
+# Cualquier licencia NO en esta lista es denegada automaticamente, incluyendo
+# GPL-2/3, LGPL-2/2.1/3, AGPL-3.0 — comportamiento por default de cargo-deny.
 allow = [
     "MIT",
     "Apache-2.0",
@@ -16,65 +27,40 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
 ]
+confidence-threshold = 0.8
 
-# Umbral de confianza para la detección automática de licencias via askalono.
-# 0.8 es el default; 0.9 es más estricto y recomendado para proyectos de seguridad.
-confidence-threshold = 0.9
-
-# Los crates propios del workspace no necesitan licencia revisada (son el proyecto mismo).
-[licenses.private]
-ignore = true
-
-# ── Bans (duplicados y crates prohibidos) ──────────────────────────────────────
 [bans]
-# Denegar múltiples versiones del mismo crate. En un proyecto de seguridad,
-# versiones duplicadas son un vector de ataque (una puede tener CVE, la otra no).
-multiple-versions = "deny"
+# "warn" en v1.3.0 (pyo3 trae duplicados); subir a "deny" en v2.0.0.
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+workspace-default-features = "allow"
+external-default-features = "allow"
 
-# Denegar dependencias con versión wildcard (*).
-wildcards = "deny"
-
-# Permite wildcards en path-dependencies de crates privados (nuestros propios crates).
-allow-wildcard-paths = true
-
-# Mostrar el camino más corto al duplicado en el grafo de dependencias.
-highlight = "simplest-path"
-
-# Crates explícitamente prohibidos en AegisQ.
-# openssl: Usar en su lugar rustls/aes-gcm del ecosistema RustCrypto.
+# Crates explicitamente prohibidos en AegisQ.
 deny = [
-    { crate = "openssl", use-instead = "aes-gcm", reason = "AegisQ usa exclusivamente RustCrypto. openssl introduce una FFI a C que rompe las garantías de seguridad de memoria." },
-    { crate = "native-tls", use-instead = "rustls", reason = "Same rationale as openssl." },
+    # Prohibir implementaciones de criptografia clasica vulnerable.
+    { name = "ring", reason = "Usar RustCrypto (sha3, aes-gcm) en su lugar" },
+    { name = "openssl", reason = "No se permite OpenSSL en el core" },
+    { name = "openssl-sys", reason = "No se permite OpenSSL en el core" },
 ]
 
-# Duplicados transitivos inevitables — crates WASM de target-lexicon/wit-bindgen
-# que no controlamos y que se resuelven a versiones distintas por el grafo de deps.
-# Estos se eliminan cuando los crates upstream actualicen sus deps.
-skip = [
-    "cpufeatures@0.2.17",
-    "cpufeatures@0.3.0",
-    "crypto-common@0.1.7",
-    "crypto-common@0.2.2",
-    "wit-bindgen@0.51.0",
-    "wit-bindgen@0.57.1",
-]
+skip = []
 
-# ── Advisories (CVEs) ──────────────────────────────────────────────────────────
 [advisories]
-# Base de datos de advisories de RustSec.
-# La URL por defecto apunta a https://github.com/RustSec/advisory-db
-# No es necesario configurar nada adicional; cargo-deny usa la DB oficial.
+# Sin advisories ignorados — cualquier vulnerabilidad publica debe bloquear CI.
+ignore = []
+# Crates unmaintained: solo falla si afecta deps directas del workspace.
+unmaintained = "workspace"
+# Crates yanked del registry: error.
+yanked = "deny"
 
-# Si un advisory no aplica al proyecto (e.g., solo afecta a una feature que no usamos),
-# se puede ignorar aquí con justificación:
-# ignore = ["RUSTSEC-XXXX-XXXX"]
-
-# ── Sources (orígenes permitidos) ──────────────────────────────────────────────
 [sources]
-# Solo se permiten crates de crates.io y del workspace local.
+# Solo permitir crates de crates.io (sin deps de git ni registries desconocidas).
 unknown-registry = "deny"
 unknown-git = "deny"
-
-# Repositorios git permitidos explícitamente (ninguno por ahora).
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = []

@@ -24,6 +24,9 @@ pub enum AegisQError {
     ///
     /// Se produce cuando el string provisto no es Base64 URL-safe valido.
     Base64DecodeError(&'static str),
+
+    /// Error al parsear o serializar el formato de llave (PEM header, JSON, magic bytes).
+    KeySerializationError(&'static str),
 }
 
 impl core::fmt::Display for AegisQError {
@@ -36,6 +39,9 @@ impl core::fmt::Display for AegisQError {
                 write!(f, "AES-GCM authentication tag verification failed")
             }
             AegisQError::Base64DecodeError(msg) => write!(f, "base64 decode error: {}", msg),
+            AegisQError::KeySerializationError(msg) => {
+                write!(f, "key serialization error: {}", msg)
+            }
         }
     }
 }
