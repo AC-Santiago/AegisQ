@@ -11,6 +11,45 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [1.3.0] - 2026-06-26
+
+### Added
+- **Serializacion de llaves** — Exportar/importar llaves en formatos estandar:
+  - Llave publica: PEM-like (`-----BEGIN ML-KEM PUBLIC KEY-----`) y JSON
+    (con campos `algorithm`/`level`/`public_key`).
+  - Llave privada: blob binario cifrado con contrasena, opcionalmente envuelto en
+    PEM ENCRYPTED (`-----BEGIN ENCRYPTED ML-KEM PRIVATE KEY-----`).
+- **Cifrado de llaves secretas**: AES-256-GCM con clave derivada via HKDF-SHA3-256
+  (HMAC-SHA3-256 manual, block size 136 bytes per NIST SP 800-185).
+- **Modulo `aegisq.keys`** — API de alto nivel para persistencia:
+  `save_public_key`, `load_public_key`, `save_secret_key`, `load_secret_key`,
+  `public_key_to_pem/json`, `secret_key_to_pem`.
+- **Excepcion `KeySerializationError`** — Para PEM/JSON/blob malformados.
+- **Tests pytest**: 19 nuevos tests en `tests/python/test_key_serialization.py`
+  cubriendo roundtrip en los 3 niveles, deteccion de formato, errores de
+  parsing, y verificacion critica de seguridad (secret_key raw NO aparece en PEM).
+- **`deny.toml`** — Configuracion de `cargo-deny` (gate de licencias, bans,
+  sources, advisories en CI).
+
+### Changed
+- **`pyo3` 0.28.3 → 0.29.0** — Fix de RUSTSEC-2026-0177 (missing `Sync` bound
+  en `PyCFunction::new_closure`).
+- **`aegisq-pyo3` agrega `getrandom` y `base64` como deps directas** —
+  necesarias para generar salt/nonce (Capa 2) y codificar Base64 STANDARD
+  (formato PEM).
+
+### Security
+- **Llaves secretas NUNCA se exportan en texto plano** — siempre cifradas
+  con AES-256-GCM (clave derivada via HKDF-SHA3-256).
+- **HMAC-SHA3-256 implementado manualmente** — block size correcto = 136 bytes
+  (rate del sponge Keccak), verificado contra Python `hashlib.sha3_256` stdlib.
+- **Wrong password en `unwrap_secret_key`** retorna `DecryptionFailed`
+  (indistinguible de blob corrupto — anti side-channel).
+- **`cargo-deny` como gate en CI** — bloquea licenses no aprobadas (GPL/LGPL/AGPL),
+  crates prohibidos (`ring`, `openssl`, `openssl-sys`), y sources fuera de crates.io.
+
+---
+
 ## [1.2.0] - 2026-05-21
 
 ### Added
