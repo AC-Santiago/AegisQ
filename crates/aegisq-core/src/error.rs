@@ -39,7 +39,9 @@ impl core::fmt::Display for AegisQError {
                 write!(f, "AES-GCM authentication tag verification failed")
             }
             AegisQError::Base64DecodeError(msg) => write!(f, "base64 decode error: {}", msg),
-            AegisQError::KeySerializationError(msg) => write!(f, "key serialization error: {}", msg),
+            AegisQError::KeySerializationError(msg) => {
+                write!(f, "key serialization error: {}", msg)
+            }
         }
     }
 }
