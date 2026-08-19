@@ -1,6 +1,18 @@
 # Flags de compilacion globales para AegisQ
 # Optimizaciones de seguridad y rendimiento
+#
+# Usa `target-cpu=x86-64-v3` (microarch level) en vez de `target-cpu=native`.
+# El nivel v3 incluye AES-NI, PCLMULQDQ, AVX2 y BMI2 — exactamente lo que
+# queremos para AES-GCM con aceleracion por hardware — sin pedirle a rustc
+# que habilite cualquier extension disponible en el CPU del runner.
+#
+# Por que NO `target-cpu=native`: en CI el runner es un host arbitrario y
+# rustc 1.96 estable puede generar instrucciones que el microcode de algunos
+# CPUs recientes rechaza con SIGILL durante la compilacion (clippy-driver
+# ha muerto con `signal 4, illegal instruction` desde que la image
+# ubuntu-24.04 paso a 20260810.271). El crate `aes` hace deteccion de
+# CPU en runtime via `cpufeatures`, asi que AES-NI sigue acelerando
+# el codigo aunque el binario no se compile con la extension forzada.
 
 [build]
-# Habilitar instrucciones AES-NI en x86_64 para aceleracion por hardware de AES-GCM
-rustflags = ["-C", "target-cpu=native"]
+rustflags = ["-C", "target-cpu=x86-64-v3"]
