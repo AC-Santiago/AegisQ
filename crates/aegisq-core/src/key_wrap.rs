@@ -26,8 +26,8 @@ use alloc::vec::Vec;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::AegisQError;
-use crate::kem::SecurityLevel;
 use crate::kdf::hkdf_sha3_256;
+use crate::kem::SecurityLevel;
 
 /// Magic bytes que identifican un blob AegisQ.
 pub const MAGIC: &[u8; 4] = b"AQPK";
@@ -215,9 +215,8 @@ mod tests {
             nonce,
         )
         .expect("wrap must succeed");
-        let (recovered, level) =
-            unwrap_secret_key(&blob, b"correct-horse-battery-staple")
-                .expect("unwrap with correct password must succeed");
+        let (recovered, level) = unwrap_secret_key(&blob, b"correct-horse-battery-staple")
+            .expect("unwrap with correct password must succeed");
         assert_eq!(level, SecurityLevel::MlKem768);
         assert_eq!(&*recovered, &sk[..]);
     }
@@ -232,10 +231,9 @@ mod tests {
             let sk = alloc::vec![0xABu8; level.secret_key_size()];
             let salt = [3u8; SALT_SIZE];
             let nonce = [4u8; NONCE_SIZE];
-            let blob = wrap_secret_key(&sk, b"pwd", level, salt, nonce)
-                .expect("wrap must succeed");
-            let (recovered, recovered_level) = unwrap_secret_key(&blob, b"pwd")
-                .expect("unwrap must succeed");
+            let blob = wrap_secret_key(&sk, b"pwd", level, salt, nonce).expect("wrap must succeed");
+            let (recovered, recovered_level) =
+                unwrap_secret_key(&blob, b"pwd").expect("unwrap must succeed");
             assert_eq!(recovered_level, level);
             assert_eq!(&*recovered, &sk[..]);
         }
@@ -260,20 +258,14 @@ mod tests {
         let mut blob = alloc::vec![0u8; 100];
         blob[..4].copy_from_slice(b"XXXX");
         let result = unwrap_secret_key(&blob, b"pwd");
-        assert!(matches!(
-            result,
-            Err(AegisQError::KeySerializationError(_))
-        ));
+        assert!(matches!(result, Err(AegisQError::KeySerializationError(_))));
     }
 
     #[test]
     fn truncated_blob_raises_key_serialization_error() {
         let blob = alloc::vec![0u8; 10];
         let result = unwrap_secret_key(&blob, b"pwd");
-        assert!(matches!(
-            result,
-            Err(AegisQError::KeySerializationError(_))
-        ));
+        assert!(matches!(result, Err(AegisQError::KeySerializationError(_))));
     }
 
     #[test]
@@ -282,10 +274,7 @@ mod tests {
         blob[..4].copy_from_slice(MAGIC);
         blob[4] = 99;
         let result = unwrap_secret_key(&blob, b"pwd");
-        assert!(matches!(
-            result,
-            Err(AegisQError::KeySerializationError(_))
-        ));
+        assert!(matches!(result, Err(AegisQError::KeySerializationError(_))));
     }
 
     #[test]
@@ -295,10 +284,7 @@ mod tests {
         blob[4] = VERSION;
         blob[5] = 99;
         let result = unwrap_secret_key(&blob, b"pwd");
-        assert!(matches!(
-            result,
-            Err(AegisQError::KeySerializationError(_))
-        ));
+        assert!(matches!(result, Err(AegisQError::KeySerializationError(_))));
     }
 
     #[test]

@@ -118,8 +118,7 @@ mod tests {
         let hex: alloc::string::String =
             result.iter().map(|b| alloc::format!("{:02x}", b)).collect();
         assert_eq!(
-            hex,
-            "e841c164e5b4f10c9f3985587962af72fd607a951196fc92fb3a5251941784ea",
+            hex, "e841c164e5b4f10c9f3985587962af72fd607a951196fc92fb3a5251941784ea",
             "HMAC-SHA3-256 de inputs vacios debe coincidir con hmac stdlib de Python (hashlib.sha3_256)"
         );
     }
@@ -135,8 +134,7 @@ mod tests {
         let hex: alloc::string::String =
             result.iter().map(|b| alloc::format!("{:02x}", b)).collect();
         assert_eq!(
-            hex,
-            "ba85192310dffa96e2a3a40e69774351140bb7185e1202cdcc917589f95e16bb",
+            hex, "ba85192310dffa96e2a3a40e69774351140bb7185e1202cdcc917589f95e16bb",
             "HMAC-SHA3-256 con clave 0x0b*20 y data 'Hi There' debe coincidir con Python"
         );
     }
