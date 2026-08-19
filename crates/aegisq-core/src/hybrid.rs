@@ -184,10 +184,13 @@ fn aes_gcm_encrypt(
     let cipher = Aes256Gcm::new_from_slice(key)
         .map_err(|_| AegisQError::InvalidParameter("AES-256-GCM key must be 32 bytes"))?;
 
-    let nonce = Nonce::from_slice(nonce_bytes);
+    // El caller garantiza 12 bytes (ver `Transit Package §1` de AGENTS.md);
+    // aes-gcm 0.11 deprecó `Nonce::from_slice` en favor de `TryFrom`.
+    let nonce = Nonce::try_from(nonce_bytes)
+        .map_err(|_| AegisQError::InvalidParameter("AES-256-GCM nonce must be 12 bytes"))?;
 
     cipher
-        .encrypt(nonce, plaintext)
+        .encrypt(&nonce, plaintext)
         .map_err(|_| AegisQError::RngError) // encrypt only fails on alloc/nonce issues
 }
 
@@ -204,7 +207,9 @@ fn aes_gcm_decrypt(
     let cipher = Aes256Gcm::new_from_slice(key)
         .map_err(|_| AegisQError::InvalidParameter("AES-256-GCM key must be 32 bytes"))?;
 
-    let nonce = Nonce::from_slice(nonce_bytes);
+    // aes-gcm 0.11 deprecó `Nonce::from_slice` en favor de `TryFrom`.
+    let nonce = Nonce::try_from(nonce_bytes)
+        .map_err(|_| AegisQError::InvalidParameter("AES-256-GCM nonce must be 12 bytes"))?;
 
     // aes-gcm expects payload as: ciphertext || tag
     let mut ct_with_tag = Vec::with_capacity(ciphertext.len() + tag.len());
@@ -212,7 +217,7 @@ fn aes_gcm_decrypt(
     ct_with_tag.extend_from_slice(tag);
 
     cipher
-        .decrypt(nonce, ct_with_tag.as_ref())
+        .decrypt(&nonce, ct_with_tag.as_ref())
         .map_err(|_| AegisQError::DecryptionFailed)
 }
 

@@ -102,9 +102,12 @@ pub fn wrap_secret_key(
     // 3. AES-256-GCM encrypt
     let cipher = Aes256Gcm::new_from_slice(&*wrap_key)
         .map_err(|_| AegisQError::KeySerializationError("invalid derived key length"))?;
-    let nonce = Nonce::from_slice(&rng_nonce);
+    // aes-gcm 0.11 deprecó `Nonce::from_slice` en favor de `TryFrom`.
+    // `rng_nonce` ya fue generado con longitud fija `NONCE_SIZE` arriba.
+    let nonce = Nonce::try_from(&rng_nonce[..])
+        .map_err(|_| AegisQError::KeySerializationError("invalid nonce length"))?;
     let ct_with_tag = cipher
-        .encrypt(nonce, secret_key)
+        .encrypt(&nonce, secret_key)
         .map_err(|_| AegisQError::KeySerializationError("AES-GCM encrypt failed"))?;
 
     // 4. Ensamblar blob en el orden canonico
@@ -182,9 +185,12 @@ pub fn unwrap_secret_key(
     // 8. AES-256-GCM decrypt — CRITICO: tag failure -> DecryptionFailed (no KeySerializationError)
     let cipher = Aes256Gcm::new_from_slice(&*wrap_key)
         .map_err(|_| AegisQError::KeySerializationError("invalid derived key length"))?;
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    // aes-gcm 0.11 deprecó `Nonce::from_slice` en favor de `TryFrom`.
+    // `nonce_bytes` ya fue validado arriba (NONCE_SIZE bytes).
+    let nonce = Nonce::try_from(&nonce_bytes[..])
+        .map_err(|_| AegisQError::KeySerializationError("invalid nonce length"))?;
     let plaintext = cipher
-        .decrypt(nonce, ct_with_tag)
+        .decrypt(&nonce, ct_with_tag)
         .map_err(|_| AegisQError::DecryptionFailed)?;
 
     // 9. Validar que la longitud recuperada coincida con el tamano esperado para el nivel
