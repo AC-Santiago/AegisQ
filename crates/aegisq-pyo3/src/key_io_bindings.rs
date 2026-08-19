@@ -13,10 +13,7 @@ use pyo3::types::PyBytes;
 
 use crate::error::core_error_to_pyerr;
 use crate::types::SecurityLevel;
-use aegisq_core::kem::{
-    self,
-    SecurityLevel as CoreSecurityLevel,
-};
+use aegisq_core::kem::{self, SecurityLevel as CoreSecurityLevel};
 use aegisq_core::key_wrap;
 
 // ── Constantes de formato PEM ────────────────────────────────────────────
@@ -37,17 +34,15 @@ fn extract_pem_body<'a>(
     header: &str,
     footer: &str,
 ) -> Result<&'a str, aegisq_core::error::AegisQError> {
-    let after_header = pem
-        .find(header)
-        .ok_or(aegisq_core::error::AegisQError::KeySerializationError(
-            "PEM header not found",
-        ))?;
+    let after_header =
+        pem.find(header)
+            .ok_or(aegisq_core::error::AegisQError::KeySerializationError(
+                "PEM header not found",
+            ))?;
     let body_start = after_header + header.len();
-    let after_footer = pem[body_start..]
-        .find(footer)
-        .ok_or(aegisq_core::error::AegisQError::KeySerializationError(
-            "PEM footer not found",
-        ))?;
+    let after_footer = pem[body_start..].find(footer).ok_or(
+        aegisq_core::error::AegisQError::KeySerializationError("PEM footer not found"),
+    )?;
     Ok(&pem[body_start..body_start + after_footer])
 }
 
@@ -74,15 +69,17 @@ pub fn load_public_key_pem<'py>(
 ) -> PyResult<Bound<'py, PyBytes>> {
     let core_level: CoreSecurityLevel = level.into();
 
-    let body = extract_pem_body(pem, PEM_PUBLIC_HEADER, PEM_PUBLIC_FOOTER)
-        .map_err(core_error_to_pyerr)?;
+    let body =
+        extract_pem_body(pem, PEM_PUBLIC_HEADER, PEM_PUBLIC_FOOTER).map_err(core_error_to_pyerr)?;
 
     let b64 = unwrap_pem_body(body);
     let bytes = STANDARD
         .decode(&b64)
-        .map_err(|_| aegisq_core::error::AegisQError::KeySerializationError(
-            "PEM body is not valid Base64 STANDARD",
-        ))
+        .map_err(|_| {
+            aegisq_core::error::AegisQError::KeySerializationError(
+                "PEM body is not valid Base64 STANDARD",
+            )
+        })
         .map_err(core_error_to_pyerr)?;
 
     // Validar tamano para el nivel — AegisQError::InvalidParameter se mapea solo
@@ -111,8 +108,7 @@ pub fn load_public_key_json<'py>(
 ) -> PyResult<(Bound<'py, PyBytes>, SecurityLevel)> {
     // Parsing manual minimo para evitar dependencia de serde.
     // Formato esperado: {"algorithm":"...","level":"...","public_key":"..."}
-    let algorithm = extract_json_string(json, "algorithm")
-        .map_err(core_error_to_pyerr)?;
+    let algorithm = extract_json_string(json, "algorithm").map_err(core_error_to_pyerr)?;
     let level_str = extract_json_string(json, "level").map_err(core_error_to_pyerr)?;
     let public_key_b64 = extract_json_string(json, "public_key").map_err(core_error_to_pyerr)?;
 
@@ -138,8 +134,8 @@ pub fn load_public_key_json<'py>(
     };
 
     // Decodifica con la funcion existente (URL-safe sin padding, con trim de whitespace).
-    let bytes = kem::public_key_from_b64(&public_key_b64, core_level)
-        .map_err(core_error_to_pyerr)?;
+    let bytes =
+        kem::public_key_from_b64(&public_key_b64, core_level).map_err(core_error_to_pyerr)?;
 
     Ok((PyBytes::new(py, &bytes), level_from_core(core_level)))
 }
@@ -159,21 +155,21 @@ fn extract_json_string(
     key: &str,
 ) -> Result<alloc::string::String, aegisq_core::error::AegisQError> {
     let needle = alloc::format!("\"{}\":", key);
-    let key_pos = json
-        .find(&needle)
-        .ok_or(aegisq_core::error::AegisQError::KeySerializationError(
-            "missing JSON field",
-        ))?;
+    let key_pos =
+        json.find(&needle)
+            .ok_or(aegisq_core::error::AegisQError::KeySerializationError(
+                "missing JSON field",
+            ))?;
     let after_key = key_pos + needle.len();
     let rest = &json[after_key..];
     let rest = rest.trim_start();
 
     // Esperamos string que empieza con "
-    let rest = rest
-        .strip_prefix('"')
-        .ok_or(aegisq_core::error::AegisQError::KeySerializationError(
-            "JSON field value is not a string",
-        ))?;
+    let rest =
+        rest.strip_prefix('"')
+            .ok_or(aegisq_core::error::AegisQError::KeySerializationError(
+                "JSON field value is not a string",
+            ))?;
     let end = rest
         .find('"')
         .ok_or(aegisq_core::error::AegisQError::KeySerializationError(
@@ -206,10 +202,7 @@ pub fn load_secret_key_raw<'py>(
 ) -> PyResult<(Bound<'py, PyBytes>, SecurityLevel)> {
     let result = py.detach(|| key_wrap::unwrap_secret_key(blob, password));
     match result {
-        Ok((sk, core_level)) => Ok((
-            PyBytes::new(py, &sk),
-            level_from_core(core_level),
-        )),
+        Ok((sk, core_level)) => Ok((PyBytes::new(py, &sk), level_from_core(core_level))),
         Err(e) => Err(core_error_to_pyerr(e)),
     }
 }
@@ -237,17 +230,16 @@ pub fn load_secret_key_pem<'py>(
     let b64 = unwrap_pem_body(body);
     let blob = STANDARD
         .decode(&b64)
-        .map_err(|_| aegisq_core::error::AegisQError::KeySerializationError(
-            "PEM ENCRYPTED body is not valid Base64 STANDARD",
-        ))
+        .map_err(|_| {
+            aegisq_core::error::AegisQError::KeySerializationError(
+                "PEM ENCRYPTED body is not valid Base64 STANDARD",
+            )
+        })
         .map_err(core_error_to_pyerr)?;
 
     let result = py.detach(|| key_wrap::unwrap_secret_key(&blob, password));
     match result {
-        Ok((sk, core_level)) => Ok((
-            PyBytes::new(py, &sk),
-            level_from_core(core_level),
-        )),
+        Ok((sk, core_level)) => Ok((PyBytes::new(py, &sk), level_from_core(core_level))),
         Err(e) => Err(core_error_to_pyerr(e)),
     }
 }
