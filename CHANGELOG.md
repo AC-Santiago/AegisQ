@@ -11,6 +11,40 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [1.4.0] - 2026-08-19
+
+### Added
+- **`AegisCipher` como context manager** — Implementa `__enter__` /
+  `__exit__` con zeroización proactiva de cualquier buffer Python-side
+  registrado durante la sesión. Hook interno
+  `_register_session_buffer(buf)` disponible para futuras APIs que
+  retengan material criptográfico Python-side (binding de sesión,
+  streaming). `__repr__` ahora muestra estado `active` / `inactive`.
+- **`KeyPair.__repr__` seguro** — Muestra solo el nivel de seguridad
+  y un fingerprint público de la clave (primeros 8 bytes de
+  `SHA3-256(public_key)` en hex). Nunca expone bytes crudos ni
+  tamaños de claves (los tamaños facilitaban ataques de correlación
+  entre instancias).
+- **`public_key_fingerprint(public_key)` en `aegisq_core::kem`** —
+  Nueva función pública Capa 1 que computa `SHA3-256(pk)[:8]`. Útil
+  para logging y debugging sin filtrar material criptográfico.
+
+### Tests
+- **Cobertura explícita de Implicit Rejection (FIPS 203 §7.3)** —
+  `tests/python/test_implicit_rejection.py` agrega 25 nuevas
+  aserciones cubriendo: nunca lanza al flipar cualquier byte del
+  capsule (3 niveles), independencia estadística de 64 tamperings
+  distintos, determinismo (mismo input → mismo output), wrong secret
+  key, y el path vía `AegisCipher` (Transit Package manipulado solo
+  levanta `DecryptionError` del tag AES-GCM, nunca `DecapsulationError`).
+- **Cobertura de `KeyPair.__repr__`** —
+  `tests/python/test_keypair_repr.py` agrega 25 nuevas aserciones
+  verificando formato, fingerprint determinístico, no-leaks de bytes
+  crudos del secret_key ni del public_key, no-leaks de Base64 ni de
+  las formas serializadas (PEM, JSON), y tamaño del repr acotado.
+
+---
+
 ## [1.3.1] - 2026-08-19
 
 ### Changed
@@ -179,7 +213,8 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 | `Fixed` | Corrección de bugs |
 | `Security` | Correcciones de seguridad o cambios relevantes para la seguridad |
 
-[Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/AC-Santiago/AegisQ/compare/v1.3.0...v1.3.1
 [1.2.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.0.0...v1.1.0
