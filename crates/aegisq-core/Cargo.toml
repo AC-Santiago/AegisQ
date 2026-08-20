@@ -1,6 +1,6 @@
 [package]
 name    = "aegisq-core"
-version = "1.3.0"
+version = "1.3.1"
 edition = "2024"
 license = "MIT"
 publish = false
@@ -9,6 +9,7 @@ publish = false
 zeroize   = { workspace = true }
 subtle    = { workspace = true }
 sha3      = { workspace = true }
+shake     = { workspace = true }
 getrandom = { workspace = true }
 aes-gcm   = { workspace = true }
 base64    = { workspace = true }

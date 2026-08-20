@@ -3,12 +3,16 @@ members  = ["crates/aegisq-core", "crates/aegisq-pyo3"]
 resolver = "2"
 
 [workspace.dependencies]
-zeroize   = { version = "1.8",  features = ["derive", "zeroize_derive"] }
+zeroize   = { version = "1.9",  features = ["derive", "zeroize_derive"] }
 subtle    = { version = "2.6",  default-features = false }
-sha3      = { version = "0.11", default-features = false }
+sha3      = { version = "0.12", default-features = false }
+# SHAKE-128/256 se movieron del crate `sha3` al crate `shake` en sha3 0.12.
+# Ver https://github.com/RustCrypto/hashes/pull/869 — SHAKE ahora vive en
+# el repo RustCrypto/XOFs y se importa como `use shake::{Shake128, Shake256}`.
+shake     = { version = "0.1",  default-features = false }
 getrandom  = { version = "0.4",  default-features = false }
-aes-gcm   = { version = "0.10", default-features = false, features = ["aes", "alloc"] }
-base64    = { version = "0.22", default-features = false, features = ["alloc"] }
+aes-gcm   = { version = "0.11", default-features = false, features = ["aes", "alloc"] }
+base64    = { version = "0.23", default-features = false, features = ["alloc"] }
 thiserror = { version = "2.0", default-features = false }
 
 [profile.release]

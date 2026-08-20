@@ -11,8 +11,11 @@
 use crate::mlkem::math::field::FieldElement;
 use crate::mlkem::math::poly::Poly;
 use crate::mlkem::params::{N, Q};
-use sha3::digest::{ExtendableOutput, Update, XofReader};
-use sha3::{Digest, Sha3_256, Sha3_512, Shake128, Shake256};
+use sha3::{Digest, Sha3_256, Sha3_512};
+// SHAKE-128/256 se movieron al crate `shake` en sha3 0.12.
+// Ver https://github.com/RustCrypto/hashes/pull/869.
+use shake::digest::{ExtendableOutput, Update, XofReader};
+use shake::{Shake128, Shake256};
 
 // ---------------------------------------------------------------------------
 // Hash functions (FIPS 203 §4.1)
