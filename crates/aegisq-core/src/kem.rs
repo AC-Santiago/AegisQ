@@ -329,6 +329,43 @@ pub fn validate_secret_key_size(sk: &[u8], level: SecurityLevel) -> Result<(), A
     Ok(())
 }
 
+/// Fingerprint publico de una clave ML-KEM: primeros 8 bytes de
+/// `SHA3-256(public_key)`, hex-encodeados en minusculas.
+///
+/// Usado por `__repr__` de `KeyPair` para identificar inequivocamente
+/// la clave publica sin filtrar material criptografico. La eleccion de
+/// SHA3-256 (funcion `H` de FIPS 203 §4.1) y un truncamiento a 8 bytes
+/// (64 bits) es deliberada:
+///
+/// - SHA3-256 ya esta en el workspace (crate `sha3`), sin nuevas deps.
+/// - 8 bytes dan 2^64 valores distintos — suficiente para que dos
+///   `KeyPair` diferentes colisionen con probabilidad < 2^-32, que es
+///   el orden de magnitud tipico de los fingerprints de certificados.
+/// - 8 bytes NO permiten invertir el hash ni recuperar la clave
+///   publica (que es publica de todos modos, asi que esto no es una
+///   preocupacion de secreto, solo de tamano del repr).
+///
+/// Devuelve una `String` hex de 16 caracteres ASCII. Es seguro
+/// formatearla en logs, repr, excepciones y mensajes de error.
+///
+/// Args:
+///     public_key: Bytes de la clave publica (longitud dependiente del
+///         nivel ML-KEM, validada o no por el caller).
+///
+/// Returns:
+///     String hex de 16 caracteres en lowercase.
+pub fn public_key_fingerprint(public_key: &[u8]) -> alloc::string::String {
+    use sha3::{Digest, Sha3_256};
+    let mut hasher = Sha3_256::new();
+    Digest::update(&mut hasher, public_key);
+    let digest = hasher.finalize();
+    let mut hex = alloc::string::String::with_capacity(16);
+    for byte in &digest[..8] {
+        let _ = alloc::fmt::Write::write_fmt(&mut hex, format_args!("{:02x}", byte));
+    }
+    hex
+}
+
 #[cfg(test)]
 mod validation_tests {
     use super::*;
