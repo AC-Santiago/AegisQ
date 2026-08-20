@@ -9,6 +9,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Changed
+- **Version bump en `develop` a `1.5.0-rc1`** — Después de publicar `v1.4.0`
+  a PyPI, `develop` debe estar en la prerelease de la siguiente versión
+  para que los tags `vX.Y.ZrcN` desde `develop` funcionen con `release.yml`
+  (publican en TestPyPI) sin que la metadata choque con la versión ya
+  publicada. Ver `AGENTS.md §12.7` para la convención completa.
+
+  Nota: en `Cargo.toml` y `pyproject.toml` se usa `1.5.0-rc1` (forma
+  SemVer con guión, requerida por Cargo). PEP 440 normaliza esa
+  forma a `1.5.0rc1` para mostrar en `pip` y en `__version__`.
+
 ---
 
 ## [1.4.0] - 2026-08-19
