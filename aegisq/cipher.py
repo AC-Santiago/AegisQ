@@ -46,10 +46,7 @@ Nota sobre zeroizacion:
 from __future__ import annotations
 
 import asyncio
-<<<<<<< HEAD
 from typing import Self
-=======
->>>>>>> origin/main
 
 from aegisq._aegisq_core import (
     KeyPair,
@@ -144,7 +141,6 @@ class AegisCipher:
         return bytes(decrypt_hybrid(encrypted_package, secret_key, self._level))
 
     def __repr__(self) -> str:
-<<<<<<< HEAD
         state = "active" if self._entered else "inactive"
         return f"AegisCipher(level={self._level!r}, {state})"
 
@@ -202,9 +198,6 @@ class AegisCipher:
                 buf[i] = 0
         self._session_buffers.clear()
         self._entered = False
-=======
-        return f"AegisCipher(level={self._level!r})"
->>>>>>> origin/main
 
     async def encrypt_async(
         self,
