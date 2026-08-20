@@ -11,7 +11,6 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
-<<<<<<< HEAD
 ## [1.4.0] - 2026-08-19
 
 ### Added
@@ -46,8 +45,6 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
-=======
->>>>>>> origin/main
 ## [1.3.1] - 2026-08-19
 
 ### Changed
@@ -216,12 +213,8 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 | `Fixed` | Corrección de bugs |
 | `Security` | Correcciones de seguridad o cambios relevantes para la seguridad |
 
-<<<<<<< HEAD
 [Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.4.0...HEAD
 [1.4.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.3.1...v1.4.0
-=======
-[Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.3.1...HEAD
->>>>>>> origin/main
 [1.3.1]: https://github.com/AC-Santiago/AegisQ/compare/v1.3.0...v1.3.1
 [1.2.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.0.0...v1.1.0
