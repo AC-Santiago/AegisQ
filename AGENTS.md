@@ -681,7 +681,9 @@ BREAKING CHANGE: callers must now use .ciphertext property
 
 4. **Inmediatamente después**: PR de sync `main` → `develop` (squash merge).
 
-5. (Opcional) Eliminar rama `release/v1.3.0` local y remoto. El tag `vX.Y.Z` queda en `main`.
+5. **Bump `develop` a la prerelease de la SIGUIENTE versión** (ver §12.7).
+
+6. (Opcional) Eliminar rama `release/v1.3.0` local y remoto. El tag `vX.Y.Z` queda en `main`.
 
 ### 12.5 Post-release checklist
 
@@ -690,9 +692,46 @@ Después de mergear un release a `main`, en orden:
 - [ ] Tag `vX.Y.Z` pusheado a `origin`
 - [ ] PyPI publicó correctamente (verificar via `pip install aegisq-pqc==vX.Y.Z`)
 - [ ] PR de sync a `develop` abierto y mergeado
-- [ ] `git diff main origin/develop --shortstat` está **VACÍO** (sin diff)
+- [ ] **PR de bump de `develop` a la siguiente prerelease abierto y mergeado** (ver §12.7)
+- [ ] `git diff main origin/develop --shortstat` muestra solo el bump de versión en `develop`
 - [ ] GitHub Release creado con notas extraídas del `CHANGELOG.md`
 - [ ] Rama `release/vX.Y.Z` eliminada (opcional)
+
+### 12.7 Convención de versionado en `develop`
+
+`develop` sigue una **convención distinta** a `main`:
+
+| Rama | Convención de version | Ejemplo tras v1.4.0 |
+|---|---|---|
+| `main` | versión estable publicada | `1.4.0` |
+| `develop` | **prerelease de la siguiente versión** | `1.5.0rc1` |
+
+Razón: `release.yml` distingue TestPyPI de PyPI prod según el contenido del tag:
+
+```yaml
+publish-testpypi:
+  if: contains(github.ref, 'rc') && branch == 'develop'
+publish:
+  if: !contains(github.ref, 'rc') && branch == 'main'
+```
+
+Tags `vX.Y.ZrcN` desde `develop` → TestPyPI. Tags `vX.Y.Z` desde `main` → PyPI prod.
+
+Si `develop` queda en `1.4.0` después de que `v1.4.0` sale, el próximo tag `v1.5.0rc1` se construye contra wheels que dicen ser `1.4.0` — `pip install aegisq-pqc==1.5.0rc1` desde TestPyPI falla porque la metadata no coincide, y `maturin develop` desde `develop` produce un wheel etiquetado `1.4.0` que PyPI rechaza por duplicado.
+
+**Regla**: tras mergear el PR de sync post-release (§12.5 paso 4), abrir inmediatamente un PR `chore/bump-develop-to-vX.Y+1.Zrc1` que bumpea los 3 manifests (`pyproject.toml`, `crates/aegisq-core/Cargo.toml`, `crates/aegisq-pyo3/Cargo.toml`) y solo eso. Sin cambios de código. CI debe pasar 6/6. Este PR puede mergearse sin review detallado.
+
+**Histórico de tags que demuestra la convención** (verificado en git tag):
+
+```
+v1.0.0rc1 → v1.0.0
+v1.1.0rc1 → v1.1.0
+v1.2.0rc1 → v1.2.0
+v1.3.0rc1 → v1.3.0
+v1.4.0         ← develop debería estar en 1.5.0rc1
+```
+
+Tras merge de este PR, develop queda en `1.5.0rc1` y la próxima release será `cut release/v1.5.0` desde develop.
 
 ### 12.6 Hotfix flow (urgencias en producción)
 
