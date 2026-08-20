@@ -11,6 +11,44 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [1.3.1] - 2026-08-19
+
+### Changed
+- **Dependencias Rust actualizadas (rust-crypto group)**:
+  - `pyo3` 0.29.0 → 0.29.2 (fix de regresión PyPy 3.11 + leaks de refcount).
+  - `zeroize` 1.8.2 → 1.9.0.
+  - `sha3` 0.11.0 → 0.12.0. **Breaking interno:** SHAKE-128/256 se
+    separaron del crate `sha3` al nuevo crate `shake` 0.1.0 mantenido
+    bajo [RustCrypto/XOFs](https://github.com/RustCrypto/XOFs). El
+    código AegisQ de `mlkem/sampling.rs` se migró a
+    `use shake::{Shake128, Shake256}`; la API de `.default()` /
+    `.update()` / `.finalize_xof()` / `.read()` no cambia.
+  - `aes-gcm` 0.10.3 → 0.11.0. `Nonce::from_slice` deprecado en favor
+    de `Nonce::try_from(...).map_err(...)?`; los 4 sitios en
+    `hybrid.rs` y `key_wrap.rs` se actualizaron.
+  - `thiserror` 2.0.18 → 2.0.19 (bump transitivo de `syn`).
+  - `base64` 0.22.1 → 0.23.1. Sin cambios de código: `simd-unsafe`
+    queda off porque seguimos con `default-features = false` +
+    `features = ["alloc"]`.
+
+### Fixed
+- **SIGILL del runner Ubuntu en `clippy-driver`** — `target-cpu=native`
+  causaba que rustc 1.96 emitiera instrucciones que el microcode del
+  nuevo image `ubuntu-24.04 / 20260810.271` rechaza. Reemplazado por
+  `target-cpu=x86-64-v3`, nivel estable de microarquitectura que
+  incluye exactamente AES-NI, PCLMULQDQ, AVX2, BMI2 y SSE4.2 (lo que
+  AegisQ necesita). El crate `aes` sigue acelerando AES-GCM en runtime
+  via `cpufeatures`, así que no se pierde rendimiento por hardware.
+- **Governance de CI** — `.github/workflows/ci.yml` ahora también
+  dispara en PRs contra `develop` (antes solo contra `main`). Cierra
+  el hueco que dejó pasar 24 diffs de `rustfmt` en `develop` desde
+  v1.3.0 sin que CI se enterara.
+- **`cargo fmt --all -- --check`** vuelve a estar limpio en `develop`
+  (los archivos de v1.3.0 fueron re-formateados al estilo de
+  `rustfmt` 1.9.0; sin cambios de semántica).
+
+---
+
 ## [1.3.0] - 2026-06-26
 
 ### Added
@@ -141,7 +179,8 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 | `Fixed` | Corrección de bugs |
 | `Security` | Correcciones de seguridad o cambios relevantes para la seguridad |
 
-[Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/AC-Santiago/AegisQ/compare/v1.3.0...v1.3.1
 [1.2.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/AC-Santiago/AegisQ/releases/tag/v1.0.0
