@@ -24,11 +24,29 @@ Ejemplo::
         encrypted_package=package,
         secret_key=keypair.secret_key,
     )
+
+Como **context manager** (zeroizacion proactiva al salir)::
+
+    with AegisCipher(level=SecurityLevel.ML_KEM_768) as cipher:
+        kp = cipher.generate_keypair()
+        pkg = cipher.encrypt(b"hola", kp.public_key)
+        # __exit__ zeroiza proactivamente cualquier buffer Python-side
+        # registrado durante la sesion.
+
+Nota sobre zeroizacion:
+    Hoy ``encrypt()`` y ``decrypt()`` son one-shot: el shared secret se
+    deriva y zeroiza dentro de Rust (via wrappers ``Zeroizing``) en cada
+    llamada, sin retencion Python-side. El context manager se
+    proporciona como contrato forward-compatible: si una API futura
+    mantiene material criptografico Python-side, ese material se
+    registra con ``_register_session_buffer`` y se zeroiza
+    deterministicamente al salir del ``with``, sin depender del GC.
 """
 
 from __future__ import annotations
 
 import asyncio
+from typing import Self
 
 from aegisq._aegisq_core import (
     KeyPair,
@@ -44,10 +62,20 @@ class AegisCipher:
 
     Args:
         level: Nivel de seguridad ML-KEM. Por defecto ``SecurityLevel.ML_KEM_768``.
+
+    Soporta uso como **context manager**. Al salir del bloque ``with``, se
+    zeroizan proactivamente todos los buffers Python-side registrados
+    durante la sesion. Hoy la API publica no retiene material; el
+    protocolo existe para forward-compatibility con futuras APIs de
+    sesion / streaming.
     """
 
     def __init__(self, level: SecurityLevel = SecurityLevel.ML_KEM_768) -> None:
         self._level = level
+        self._entered: bool = False
+        # Buffers Python-side retenidos durante la sesion. Cada uno es
+        # un bytearray para que podamos sobrescribir su contenido in-place.
+        self._session_buffers: list[bytearray] = []
 
     @property
     def level(self) -> SecurityLevel:
@@ -113,7 +141,63 @@ class AegisCipher:
         return bytes(decrypt_hybrid(encrypted_package, secret_key, self._level))
 
     def __repr__(self) -> str:
-        return f"AegisCipher(level={self._level!r})"
+        state = "active" if self._entered else "inactive"
+        return f"AegisCipher(level={self._level!r}, {state})"
+
+    # ── Context manager: zeroizacion proactiva al salir ──────────────────────
+
+    def __enter__(self) -> Self:
+        """Marca la sesion como activa y devuelve ``self``.
+
+        Usar dentro de un bloque ``with``::
+
+            with AegisCipher() as cipher:
+                cipher.encrypt(b"...", pk)
+                # __exit__ zeroiza proactivamente cualquier buffer
+                # Python-side registrado durante la sesion.
+        """
+        self._entered = True
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
+        """Sale del contexto zeroizando proactivamente los buffers retenidos.
+
+        No suprime excepciones: cualquier error dentro del bloque ``with``
+        se propaga al llamador despues de la zeroizacion.
+        """
+        self._zeroize_session()
+        return False  # do not suppress exceptions
+
+    def _register_session_buffer(self, buf: bytearray) -> bytearray:
+        """Registra un ``bytearray`` para zeroizacion proactiva al ``__exit__``.
+
+        API interna usada por futuras features (ej. ``bind_session``,
+        ``encrypt_stream``) que retengan material criptografico Python-side.
+        El material se sobrescribe con ceros deterministicamente al salir
+        del contexto, sin depender de la recoleccion de basura.
+
+        Args:
+            buf: buffer mutable a registrar (se modifica in-place).
+
+        Returns:
+            El mismo buffer (para encadenar).
+        """
+        self._session_buffers.append(buf)
+        return buf
+
+    def _zeroize_session(self) -> None:
+        """Sobrescribe con ceros todos los buffers registrados y limpia la lista.
+
+        Llamado por ``__exit__``. Idempotente: invocarlo multiples veces
+        es seguro. No lanza excepciones si no hay buffers registrados.
+        """
+        for buf in self._session_buffers:
+            # Sobrescribimos in-place para que cualquier referencia
+            # externa al bytearray vea ceros, no solo esta lista.
+            for i in range(len(buf)):
+                buf[i] = 0
+        self._session_buffers.clear()
+        self._entered = False
 
     async def encrypt_async(
         self,

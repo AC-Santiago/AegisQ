@@ -74,12 +74,13 @@ impl KeyPair {
     }
 
     fn __repr__(&self) -> String {
-        format!(
-            "KeyPair(level={:?}, pk_size={}, sk_size={})",
-            self.level,
-            self.public_key_bytes.len(),
-            self.secret_key_bytes.len()
-        )
+        // SAFE __repr__: muestra el nivel y un fingerprint publico de
+        // la clave (primeros 8 bytes de SHA3-256(public_key) en hex).
+        // Nunca expone bytes crudos de la clave secreta, y la clave
+        // publica solo se identifica via su fingerprint truncado.
+        // Detalles: ver `aegisq_core::kem::public_key_fingerprint`.
+        let fp = aegisq_core::kem::public_key_fingerprint(&self.public_key_bytes);
+        alloc::format!("KeyPair(level={:?}, fp={})", self.level, fp)
     }
 
     /// Serializa la clave publica a Base64 URL-safe sin padding.

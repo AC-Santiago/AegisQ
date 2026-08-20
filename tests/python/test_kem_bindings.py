@@ -85,8 +85,15 @@ class TestGenerateKeypair:
         kp = generate_keypair(SecurityLevel.ML_KEM_768)
         r = repr(kp)
         assert "KeyPair" in r
-        assert "1184" in r  # pk size
-        assert "2400" in r  # sk size
+        # v1.4.0: el repr ya NO expone tamano de claves (informacion que
+        # combinada con otra metadata facilita ataques de correlacion).
+        # En su lugar muestra un fingerprint publico SHA3-256(pk)[:8].
+        assert "fp=" in r
+        import re
+        assert re.search(r"fp=[0-9a-f]{16}", r) is not None
+        # Tamano de claves NUNCA debe aparecer.
+        assert "1184" not in r
+        assert "2400" not in r
 
 
 # --- encapsulate / decapsulate ---
