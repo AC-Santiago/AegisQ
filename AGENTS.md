@@ -681,13 +681,9 @@ BREAKING CHANGE: callers must now use .ciphertext property
 
 4. **Inmediatamente después**: PR de sync `main` → `develop` (squash merge).
 
-<<<<<<< HEAD
 5. **Bump `develop` a la prerelease de la SIGUIENTE versión** (ver §12.7).
 
 6. (Opcional) Eliminar rama `release/v1.3.0` local y remoto. El tag `vX.Y.Z` queda en `main`.
-=======
-5. (Opcional) Eliminar rama `release/v1.3.0` local y remoto. El tag `vX.Y.Z` queda en `main`.
->>>>>>> origin/main
 
 ### 12.5 Post-release checklist
 
@@ -696,7 +692,6 @@ Después de mergear un release a `main`, en orden:
 - [ ] Tag `vX.Y.Z` pusheado a `origin`
 - [ ] PyPI publicó correctamente (verificar via `pip install aegisq-pqc==vX.Y.Z`)
 - [ ] PR de sync a `develop` abierto y mergeado
-<<<<<<< HEAD
 - [ ] **PR de bump de `develop` a la siguiente prerelease abierto y mergeado** (ver §12.7)
 - [ ] `git diff main origin/develop --shortstat` muestra solo el bump de versión en `develop`
 - [ ] GitHub Release creado con notas extraídas del `CHANGELOG.md`
@@ -738,12 +733,6 @@ v1.4.0         ← develop debería estar en 1.5.0rc1
 
 Tras merge de este PR, develop queda en `1.5.0rc1` y la próxima release será `cut release/v1.5.0` desde develop.
 
-=======
-- [ ] `git diff main origin/develop --shortstat` está **VACÍO** (sin diff)
-- [ ] GitHub Release creado con notas extraídas del `CHANGELOG.md`
-- [ ] Rama `release/vX.Y.Z` eliminada (opcional)
-
->>>>>>> origin/main
 ### 12.6 Hotfix flow (urgencias en producción)
 
 Si se descubre un bug crítico en `v1.2.0` (ya publicado en PyPI):
