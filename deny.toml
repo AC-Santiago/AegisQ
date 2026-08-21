@@ -1,12 +1,22 @@
 # cargo-deny configuration for AegisQ
 # Docs: https://embarkstudios.github.io/cargo-deny/
 #
-# Schema actual (cargo-deny 0.19):
+# Schema actual (cargo-deny 0.20.2):
 # - [licenses] ya NO tiene keys deprecadas (deny/unlicensed/copyleft removidas).
 #   Cualquier licencia NO listada en `allow` es denegada por default.
+# - [licenses] soporta per-crate `exceptions` y `clarify` (manuales).
 # - [advisories] requiere `unmaintained = "all"|"workspace"|"transitive"|"none"`.
+# - [advisories] soporta `db-urls` para mirrors de la advisory-db.
+# - [bans] soporta `allow`, `allow-workspace`, `skip-tree`, y
+#   `[[bans.features]]` para allow/deny por feature individual.
+# - [sources] soporta `[sources.allow-org]` para GitHub/GitLab/Bitbucket.
+# - [graph] soporta `exclude`, `all-features`, `no-default-features`,
+#   `features` para control fino del grafo analizado.
+# - [output] controla `feature-depth` de los inclusion graphs.
 
 [graph]
+# Targets para los que se construye el wheel binario. Cobertura:
+# Linux x86_64 + aarch64, macOS x86_64 + aarch64, Windows x86_64.
 targets = [
     { triple = "x86_64-unknown-linux-gnu" },
     { triple = "aarch64-unknown-linux-gnu" },
@@ -14,11 +24,21 @@ targets = [
     { triple = "aarch64-apple-darwin" },
     { triple = "x86_64-pc-windows-msvc" },
 ]
+# Por defecto cargo-deny usa `--features default`. Cambiar a all-features
+# ampliaria el grafo con combinaciones de features; para AegisQ el
+# grafo default es suficiente porque las features criticas (pyo3/abi3,
+# aes/aes-gcm) ya estan en el set default de cada crate.
 
 [licenses]
 # Licencias aprobadas para AegisQ (todo el dependency tree).
-# Cualquier licencia NO en esta lista es denegada automaticamente, incluyendo
-# GPL-2/3, LGPL-2/2.1/3, AGPL-3.0 — comportamiento por default de cargo-deny.
+# Cualquier licencia NO en esta lista es denegada automaticamente,
+# incluyendo GPL-2/3, LGPL-2/2.1/3, AGPL-3.0 — comportamiento por
+# default de cargo-deny.
+#
+# Nota: "Unicode-3.0", "Unicode-DFS-2016" y "Zlib" aparecen como
+# `license-not-encountered` porque el arbol actual no las usa, pero
+# se mantienen intencionalmente como future-proof por si una nueva
+# dep transitiva las necesita (e.g. crate `unicode-*` o `miniz_oxide`).
 allow = [
     "MIT",
     "Apache-2.0",
@@ -51,16 +71,37 @@ deny = [
 skip = []
 
 [advisories]
-# Sin advisories ignorados — cualquier vulnerabilidad publica debe bloquear CI.
+# Sin advisories ignorados — cualquier vulnerabilidad publica debe
+# bloquear CI.
 ignore = []
+# URL de la base de advisories oficial de RustSec. Por defecto es
+# https://github.com/rustsec/advisory-db; se declara explicitamente
+# para que un mirror custom (e.g. interno corporativo) sea trivial.
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# Si true, cargo-deny usa el binario `git` externo en lugar de su
+# libreria git embebida. Util cuando el registry requiere autenticacion
+# que la libreria no soporta. Por defecto false (lib embebida).
+git-fetch-with-cli = false
 # Crates unmaintained: solo falla si afecta deps directas del workspace.
 unmaintained = "workspace"
 # Crates yanked del registry: error.
 yanked = "deny"
 
 [sources]
-# Solo permitir crates de crates.io (sin deps de git ni registries desconocidas).
+# Stricter que el default ("warn"): cualquier crate de un registry
+# o repo git NO en la allow list debe romper el CI. AegisQ solo
+# consume de crates.io y nada mas.
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = []
+
+# Organizaciones de git permitidas. Vacio = ninguna. Por defecto
+# cualquier git source externo falla el check `unknown-git` (ver
+# arriba). Esta sección existe desde 0.19.9 para que un usuario
+# pueda hacer allow-list por organizacion si necesita deps de
+# fuentes internas; AegisQ no las usa.
+[sources.allow-org]
+github = []
+gitlab = []
+bitbucket = []

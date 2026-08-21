@@ -16,3 +16,4 @@ pub mod kdf;
 pub mod kem;
 pub mod key_wrap;
 pub mod mlkem;
+pub mod stream;
