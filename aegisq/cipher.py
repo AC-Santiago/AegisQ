@@ -25,7 +25,6 @@ Ejemplo::
         secret_key=keypair.secret_key,
     )
 
-<<<<<<< HEAD
 Streaming para archivos grandes (v1.5.0)::
 
     with open("video.mp4", "rb") as f:
@@ -34,8 +33,6 @@ Streaming para archivos grandes (v1.5.0)::
             for ct_chunk in cipher.encrypt_stream(pk, src):
                 out.write(ct_chunk)
 
-=======
->>>>>>> origin/main
 Como **context manager** (zeroizacion proactiva al salir)::
 
     with AegisCipher(level=SecurityLevel.ML_KEM_768) as cipher:
@@ -57,11 +54,8 @@ Nota sobre zeroizacion:
 from __future__ import annotations
 
 import asyncio
-<<<<<<< HEAD
 import struct
 from collections.abc import Iterable, Iterator
-=======
->>>>>>> origin/main
 from typing import Self
 
 from aegisq._aegisq_core import (
