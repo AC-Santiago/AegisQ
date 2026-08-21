@@ -445,6 +445,8 @@ impl Drop for StreamDecryptor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    // `vec!` macro lives in `alloc::vec` (no_std crate).
+    use alloc::vec;
 
     fn random_base_nonce() -> [u8; AES_GCM_NONCE_SIZE] {
         let mut n = [0u8; AES_GCM_NONCE_SIZE];
