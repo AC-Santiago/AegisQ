@@ -9,6 +9,64 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+<<<<<<< HEAD
+---
+
+## [1.5.0] - 2026-08-21
+
+### Added
+- **`AegisCipher.encrypt_stream` / `AegisCipher.decrypt_stream`** —
+  API streaming para cifrar/descifrar archivos grandes (GB+) sin
+  cargarlos en memoria. Usa generadores de Python; el caller
+  controla el chunking de I/O.
+
+  Formato del Transit Package (modo stream):
+
+  * Header: `[capsule | base_nonce (12B) | chunk_size (4B BE u32)]`
+  * Per-chunk frame: `[len (4B BE u32) | ciphertext (len B) | tag (16B)]`
+  * EOF marker: `[len = 0 | tag (16B sobre plaintext vacio)]`
+
+  Nonce derivation: `nonce_i = chunk_index.to_be_bytes() ||
+  base_nonce[4..12]`. AAD: `chunk_index.to_be_bytes()` (4 bytes).
+  Cap: 2^32 chunks por stream, chunk_size <= 16 MiB.
+
+  Capa 1 (`aegisq-core/src/stream.rs`): structs `StreamEncryptor` /
+  `StreamDecryptor` con 8 tests unitarios.
+  Capa 2 (`aegisq-pyo3/src/stream_bindings.rs`): bindings PyO3 que
+  liberan el GIL durante AES-GCM.
+  Capa 3 (`aegisq/cipher.py`): generadores `encrypt_stream` y
+  `decrypt_stream`, helper `_frame_iter` para reensamblar frames
+  desde reads no alineados.
+
+- **Benchmarks Criterion** — Capa 1 mide NTT forward/inverse/multiply
+  y KeyGen/Encaps/Decaps en los 3 niveles de ML-KEM. Comando:
+  `cargo bench`. Numeros de referencia: NTT forward ~3.8 us,
+  KeyGen ML-KEM-768 ~84 us.
+
+  Archivos:
+  * `crates/aegisq-core/benches/ntt.rs`
+  * `crates/aegisq-core/benches/kem.rs`
+
+  Dev-dependency: `criterion = "0.5"` con
+  `default-features = false, features = ["cargo_bench_support"]`
+  para mantener `aegisq-core` no_std.
+
+### Changed
+- **`deny.toml` modernizado para cargo-deny 0.20.2** — El header del
+  archivo decia 0.19; el runtime ya estaba en 0.20.2. Cambios:
+  - Documentacion de todas las nuevas secciones opcionales.
+  - `[sources.allow-org]` agregada (vacia; documenta que AegisQ no
+    usa git deps de organizacion alguna).
+  - `[advisories] db-urls` y `git-fetch-with-cli` declarados
+    explicitamente con comentarios (defaults, pero futuros mirrors
+    corporativos son un one-line swap).
+  - `[licenses]` comentario explicando que `Unicode-3.0`,
+    `Unicode-DFS-2016` y `Zlib` son entradas future-proof
+    intencionales (warning `license-not-encountered` es esperado).
+  - `[sources] unknown-registry = "deny"` y `unknown-git = "deny"`
+    documentados (el default de 0.20 es `"warn"`, lo subimos por
+    seguridad).
+=======
 ### Changed
 - **Version bump en `develop` a `1.5.0-rc1`** — Después de publicar `v1.4.0`
   a PyPI, `develop` debe estar en la prerelease de la siguiente versión
@@ -19,6 +77,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   Nota: en `Cargo.toml` y `pyproject.toml` se usa `1.5.0-rc1` (forma
   SemVer con guión, requerida por Cargo). PEP 440 normaliza esa
   forma a `1.5.0rc1` para mostrar en `pip` y en `__version__`.
+>>>>>>> origin/develop
 
 ---
 
@@ -224,7 +283,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 | `Fixed` | Corrección de bugs |
 | `Security` | Correcciones de seguridad o cambios relevantes para la seguridad |
 
+<<<<<<< HEAD
+[Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.4.0...v1.5.0
+=======
 [Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.4.0...HEAD
+>>>>>>> origin/develop
 [1.4.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/AC-Santiago/AegisQ/compare/v1.3.0...v1.3.1
 [1.2.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.1.0...v1.2.0
