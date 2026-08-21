@@ -53,11 +53,10 @@ Nota sobre zeroizacion:
 
 from __future__ import annotations
 
-from __future__ import annotations
-
 import asyncio
 import struct
-from typing import Iterable, Iterator, Self
+from collections.abc import Iterable, Iterator
+from typing import Self
 
 from aegisq._aegisq_core import (
     KeyPair,
@@ -69,7 +68,6 @@ from aegisq._aegisq_core import (
     stream_encryptor_new,
 )
 from aegisq.exceptions import DecryptionError, InvalidParameterError
-
 
 # ── Helpers para decrypt_stream parsing ────────────────────────────────────
 
@@ -124,10 +122,10 @@ def _frame_iter(
         while len(buffer) < needed:
             try:
                 buffer.extend(next(iterator))
-            except StopIteration:
+            except StopIteration as err:
                 raise DecryptionError(
                     f"frame truncated: expected {needed} bytes, got {len(buffer)}"
-                )
+                ) from err
 
         # Extraer el frame completo del buffer.
         frame = bytes(buffer[:needed])
@@ -316,8 +314,8 @@ class AegisCipher:
 
         try:
             first = next(iterator)
-        except StopIteration:
-            raise DecryptionError("empty stream")
+        except StopIteration as err:
+            raise DecryptionError("empty stream") from err
 
         # El primer chunk yielded por encrypt_stream es el header.
         # En el consumer, el primer chunk que llega puede ser mas
@@ -329,20 +327,18 @@ class AegisCipher:
         while len(buffer) < header_size:
             try:
                 buffer.extend(next(iterator))
-            except StopIteration:
+            except StopIteration as err:
                 raise DecryptionError(
                     "stream header truncated: expected "
                     f"{header_size} bytes, got {len(buffer)}"
-                )
+                ) from err
 
         header_bytes = bytes(buffer[:header_size])
         # Cualquier byte extra del primer chunk es el primer frame.
         leftover = bytes(buffer[header_size:])
 
         # Crear el decryptor desde el header.
-        dec = stream_decryptor_from_header(
-            header_bytes, secret_key, self._level
-        )
+        dec = stream_decryptor_from_header(header_bytes, secret_key, self._level)
 
         # Parsear el primer frame (puede venir completo en el primer
         # chunk del input, o seguir en los subsiguientes).
