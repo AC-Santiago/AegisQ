@@ -13,6 +13,7 @@ mod error;
 mod hybrid_bindings;
 mod kem_bindings;
 mod key_io_bindings;
+mod stream_bindings;
 mod types;
 
 /// Modulo Python `_aegisq_core`.
@@ -55,6 +56,15 @@ fn _aegisq_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(key_io_bindings::load_public_key_json, m)?)?;
     m.add_function(wrap_pyfunction!(key_io_bindings::load_secret_key_raw, m)?)?;
     m.add_function(wrap_pyfunction!(key_io_bindings::load_secret_key_pem, m)?)?;
+
+    // Registrar streaming (v1.5.0)
+    m.add_class::<stream_bindings::StreamEncryptorHandle>()?;
+    m.add_class::<stream_bindings::StreamDecryptorHandle>()?;
+    m.add_function(wrap_pyfunction!(stream_bindings::stream_encryptor_new, m)?)?;
+    m.add_function(wrap_pyfunction!(
+        stream_bindings::stream_decryptor_from_header,
+        m
+    )?)?;
 
     Ok(())
 }
