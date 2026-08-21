@@ -26,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       branch: ${{ steps.get-branch.outputs.branch }}
+      rc_tag: ${{ steps.verify-rc.outputs.rc_tag }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -44,6 +45,36 @@ jobs:
             | head -1)
           echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
           echo "Tag '$GITHUB_REF_NAME' found on branch: '${BRANCH}'"
+
+      # ── Verificar publicacion previa en TestPyPI ─────────────────────────
+      # Para cualquier tag de PRODUCCION (sin "rc"), exigimos que exista
+      # un tag rc previo con la misma base de version (e.g. v1.5.0 requiere
+      # v1.5.0rc1 o v1.5.0rc2 ya publicado en TestPyPI). Esto enforce la
+      # regla de AGENTS.md §12.5: TestPyPI antes que PyPI prod.
+      # Tags rc (que van a TestPyPI) saltan este check.
+      - name: Verify TestPyPI was published first for this version
+        id: verify-rc
+        if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref, 'rc')
+        run: |
+          # Quita el prefijo "v" para obtener la base (e.g. v1.5.0 -> 1.5.0).
+          BASE_VERSION="${GITHUB_REF_NAME#v}"
+          # Busca cualquier tag rc con esa base. v1.5.0 -> v1.5.0rc*
+          # (acepta rc1, rc2, etc.; el primero que exista es suficiente).
+          RC_TAG=$(git tag --list "v${BASE_VERSION}rc*" | head -1)
+          if [ -z "$RC_TAG" ]; then
+            echo "::error::Tag '${GITHUB_REF_NAME}' es una publicacion de produccion pero no existe ningun tag rc previo (v${BASE_VERSION}rc*) para esta version."
+            echo "::error::Antes de mergear a main y taggear v${BASE_VERSION}, hay que publicar primero a TestPyPI."
+            echo "::error::Pasos:"
+            echo "::error::  1. Asegurate de que develop esta en ${BASE_VERSION}rc1 (o rcN)."
+            echo "::error::  2. git tag -a v${BASE_VERSION}rc1 -m 'v${BASE_VERSION}rc1 — prerelease' <commit>"
+            echo "::error::  3. git push origin v${BASE_VERSION}rc1"
+            echo "::error::  4. Espera a que release.yml publique a TestPyPI."
+            echo "::error::  5. Recién ahora tagea v${BASE_VERSION} en main y mergea el PR de release."
+            echo "::error::Ver AGENTS.md §12.5 para la convencion completa."
+            exit 1
+          fi
+          echo "rc_tag=${RC_TAG}" >> "$GITHUB_OUTPUT"
+          echo "OK: TestPyPI publish previo verificado via tag '${RC_TAG}' antes de '${GITHUB_REF_NAME}'."
 
   # ── Build wheels: Linux (manylinux) ──────────────────────────────────────
   build-linux:
