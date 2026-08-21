@@ -685,6 +685,56 @@ BREAKING CHANGE: callers must now use .ciphertext property
 
 6. (Opcional) Eliminar rama `release/v1.3.0` local y remoto. El tag `vX.Y.Z` queda en `main`.
 
+### 12.4.1 Regla critica: TestPyPI antes de PyPI prod
+
+**Toda publicacion de produccion en PyPI debe estar precedida por al
+menos un tag rc publicado en TestPyPI.** Esta regla se enforce
+automaticamente en `.github/workflows/release.yml` (job
+`check-branch` > step `verify-rc`).
+
+Concretamente:
+
+| Accion | Resultado en `release.yml` |
+|---|---|
+| Tag `v1.5.0rc1` en develop (u origin) | Build -> TestPyPI OK. **No publica a PyPI prod.** |
+| Tag `v1.5.0` en main sin rc previo | Build OK, pero `check-branch` FALLA con error claro. PyPI y GitHub Release no corren. |
+| Tag `v1.5.0` en main con `v1.5.0rc1` previo | Build -> TestPyPI OK, **publica a PyPI prod**, GitHub Release creado. |
+
+**Workflow para hacer un release correctamente:**
+
+```bash
+# 1. Asegurarse de que develop esta en <X>.<Y+1>.0rc1
+#    (sigue la convencion de §12.7).
+git checkout develop && git pull --ff-only
+
+# 2. Tag del prerelease en develop. ESTO dispara TestPyPI.
+git tag -a v1.6.0rc1 -m "v1.6.0rc1 — prerelease" <commit>
+git push origin v1.6.0rc1
+# Esperar a que release.yml publique a TestPyPI y verificar.
+
+# 3. Recien ahora, cut del release branch y PR a main.
+git checkout -b release/v1.6.0 develop
+# Bump de version 1.6.0-rc1 -> 1.6.0 + CHANGELOG.
+# PR a main. Despues del merge:
+
+# 4. Tag de produccion en main. ESTO dispara PyPI prod
+#    (porque ahora existe v1.6.0rc1 en el repo).
+git tag -a v1.6.0 -m "v1.6.0 — release" <merge-commit>
+git push origin v1.6.0
+```
+
+Si el tag de produccion se pushea **sin** el rc previo, el job
+`check-branch` falla con:
+
+> Tag 'v1.6.0' es una publicacion de produccion pero no existe
+> ningun tag rc previo (v1.6.0rc*) para esta version. Antes de
+> mergear a main y taggear v1.6.0, hay que publicar primero a
+> TestPyPI.
+
+El bypass de emergencia es: tagear rc1 inmediatamente, esperar a
+que TestPyPI publique, y luego tagear la produccion. No hay un
+atajo para saltarse TestPyPI.
+
 ### 12.5 Post-release checklist
 
 Después de mergear un release a `main`, en orden:
