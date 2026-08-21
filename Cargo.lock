@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "aegisq-core"
-version = "1.5.0"
+version = "1.6.0-rc1"
 dependencies = [
  "aes-gcm",
  "base64",
@@ -29,7 +29,7 @@ dependencies = [
 
 [[package]]
 name = "aegisq-pyo3"
-version = "1.5.0"
+version = "1.6.0-rc1"
 dependencies = [
  "aegisq-core",
  "base64",
