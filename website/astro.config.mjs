@@ -12,6 +12,19 @@ export default defineConfig({
 			title: 'AegisQ Docs',
 			description:
 				'Post-Quantum Cryptography for Python — ML-KEM (FIPS 203) + AES-256-GCM',
+			// i18n: English is the root locale (URLs without /en/ prefix).
+			// Spanish translations live under src/content/docs/es/ and use /es/ URLs.
+			// Starlight auto-generates the language switcher in the header.
+			locales: {
+				root: {
+					label: 'English',
+					lang: 'en',
+				},
+				es: {
+					label: 'Español',
+					lang: 'es',
+				},
+			},
 			social: [
 				{
 					icon: 'github',
