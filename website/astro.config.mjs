@@ -4,47 +4,63 @@ import starlight from '@astrojs/starlight';
 
 // https://astro.build/config
 export default defineConfig({
+	// Set a site URL so integrations like @astrojs/sitemap can be enabled later.
+	// Update this when AegisQ ships a public docs site (e.g. https://aegisq.dev).
+	site: 'https://aegisq-pqc.readthedocs.io',
 	integrations: [
 		starlight({
 			title: 'AegisQ Docs',
+			description:
+				'Post-Quantum Cryptography for Python — ML-KEM (FIPS 203) + AES-256-GCM',
 			social: [
 				{
 					icon: 'github',
 					label: 'GitHub',
 					href: 'https://github.com/AC-Santiago/AegisQ',
 				},
+				{
+					icon: 'seti:python',
+					label: 'PyPI',
+					href: 'https://pypi.org/project/aegisq-pqc/',
+				},
 			],
 			sidebar: [
 				{
 					label: 'Getting Started',
 					items: [
-						{ label: 'Installation', slug: 'getting-started/installation' },
-						{ label: 'Quick Start', slug: 'getting-started/quickstart' },
+						{ slug: 'getting-started/installation' },
+						{ slug: 'getting-started/quickstart' },
 					],
 				},
 				{
 					label: 'API Reference',
 					items: [
-						{ label: 'AegisCipher', slug: 'api-reference/aegiscipher' },
-						{ label: 'MlKem', slug: 'api-reference/mlkem' },
-						{ label: 'Security Levels', slug: 'api-reference/security-levels' },
-						{ label: 'Exceptions', slug: 'api-reference/exceptions' },
+						{ slug: 'api-reference/aegiscipher' },
+						{ slug: 'api-reference/keypair' },
+						{ slug: 'api-reference/mlkem' },
+						{ slug: 'api-reference/security-levels' },
+						{ slug: 'api-reference/streaming' },
+						{ slug: 'api-reference/async-methods' },
+						{ slug: 'api-reference/context-manager' },
+						{ slug: 'api-reference/ephemeral-session' },
+						{ slug: 'api-reference/key-serialization' },
+						{ slug: 'api-reference/exceptions' },
 					],
 				},
 				{
 					label: 'Internals',
 					items: [
-						{ label: 'Architecture', slug: 'internals/architecture' },
-						{ label: 'Mathematical Foundation', slug: 'internals/mathematical-foundation' },
-						{ label: 'Security Model', slug: 'internals/security-model' },
-						{ label: 'Hybrid KEM-DEM', slug: 'internals/hybrid-kem-dem' },
+						{ slug: 'internals/architecture' },
+						{ slug: 'internals/hybrid-kem-dem' },
+						{ slug: 'internals/mathematical-foundation' },
+						{ slug: 'internals/security-model' },
 					],
 				},
 				{
 					label: 'Reference',
 					items: [
-						{ label: 'FIPS 203 Compliance', slug: 'reference/fips203-compliance' },
-						{ label: 'Glossary', slug: 'reference/glossary' },
+						{ slug: 'reference/fips203-compliance' },
+						{ slug: 'reference/glossary' },
 					],
 				},
 			],

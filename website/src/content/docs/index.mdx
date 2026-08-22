@@ -42,3 +42,35 @@ AegisQ is a hybrid cryptographic library that combines **ML-KEM** (FIPS 203) for
     PEP 561 type stubs with full IDE autocompletion support. Catch errors before runtime.
   </Card>
 </CardGrid>
+
+## Beyond the Basics
+
+AegisQ ships production-ready extensions on top of the one-shot hybrid flow:
+
+<CardGrid>
+  <Card title="Streaming Encryption" icon="stream">
+    Encrypt gigabyte-scale files with bounded memory via `encrypt_stream` / `decrypt_stream` generators. v1.5.0.
+  </Card>
+  <Card title="Async API" icon="rocket">
+    `encrypt_async` / `decrypt_async` offload to a thread pool without blocking the event loop. v1.4.0.
+  </Card>
+  <Card title="Key Serialization" icon="document">
+    PEM, JSON, and encrypted-PEM persistence with HKDF-SHA3-256 password protection. v1.3.0.
+  </Card>
+  <Card title="Forward Secrecy" icon="seti:forward">
+    `EphemeralSession` auto-destroys each ephemeral keypair on close — past sessions stay safe.
+  </Card>
+  <Card title="Context Manager" icon="seti:config">
+    `with AegisCipher()` proactively zeroes any registered Python-side buffer on exit. v1.4.0.
+  </Card>
+  <Card title="NIST KAT Verified" icon="approve-check-circle">
+    Implementation validated against NIST ACVP test vectors — bit-exact match with the reference implementation.
+  </Card>
+</CardGrid>
+
+## Get Started
+
+- [Installation](/getting-started/installation/) — install from PyPI or build from source.
+- [Quick Start](/getting-started/quickstart/) — encrypt your first payload in 3 lines.
+- [API Reference](/api-reference/aegiscipher/) — full class and method documentation.
+- [Architecture](/internals/architecture/) — how the Rust core, FFI bridge, and Python API fit together.
