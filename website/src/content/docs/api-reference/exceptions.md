@@ -8,11 +8,13 @@ AegisQ defines a hierarchy of exceptions that map to specific cryptographic fail
 ## Exception Hierarchy
 
 ```text
-AegisQError(Exception)                          Base exception
-├── DecapsulationError(AegisQError)             ML-KEM structural error (wrong buffer size)
-├── DecryptionError(AegisQError)                AES-GCM auth tag failed (tampered or wrong key)
-├── InvalidParameterError(AegisQError, ValueError)  Incorrect parameter sizes
-└── RngError(AegisQError)                       OS CSPRNG unavailable
+AegisQError(Exception)                                Base exception
+├── DecapsulationError(AegisQError)                   ML-KEM structural error (wrong buffer size)
+├── DecryptionError(AegisQError)                      AES-GCM auth tag failed (tampered or wrong key)
+├── InvalidParameterError(AegisQError, ValueError)    Incorrect parameter sizes
+├── KeySerializationError(AegisQError)                Malformed PEM / JSON / magic / version
+├── RngError(AegisQError)                             OS CSPRNG unavailable
+└── SessionExpiredError(AegisQError)                  Use of a closed EphemeralSession
 ```
 
 ## Exception Details
@@ -36,9 +38,17 @@ Raised when AES-GCM authentication tag verification fails. This means either:
 
 Raised when parameter sizes don't match the expected values for the security level (e.g., providing a 768-byte public key when ML-KEM-1024 expects 1568 bytes). Inherits from both `AegisQError` and `ValueError`.
 
+### `KeySerializationError`
+
+Raised by the file-based key persistence helpers in [`aegisq.keys`](/api-reference/key-serialization/) when a PEM, JSON, magic, or version header is malformed or missing. Distinguished from `DecryptionError` (which fires when the password is wrong): `KeySerializationError` means the **structure** of the file is invalid, regardless of password correctness.
+
 ### `RngError`
 
 Raised when the operating system's CSPRNG (Cryptographically Secure Pseudo-Random Number Generator) is unavailable. This is extremely rare and typically indicates a system-level issue.
+
+### `SessionExpiredError`
+
+Raised by [`EphemeralSession`](/api-reference/ephemeral-session/) when `encrypt()` or `decrypt()` is called after the session has been closed (either explicitly via `close()` or implicitly via context-manager exit). The ephemeral secret key has been discarded at that point, so the operation cannot proceed.
 
 ## Error Handling Example
 
@@ -85,6 +95,8 @@ from aegisq import (
     DecapsulationError,
     DecryptionError,
     InvalidParameterError,
+    KeySerializationError,
     RngError,
+    SessionExpiredError,
 )
 ```

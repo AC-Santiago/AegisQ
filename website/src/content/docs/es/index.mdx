@@ -1,0 +1,111 @@
+---
+title: Bienvenido a AegisQ
+description: Criptografía Post-Cuántica para Python — ML-KEM (FIPS 203) + AES-256-GCM
+template: splash
+hero:
+  title: AegisQ
+  tagline: Criptografía Post-Cuántica para Python — ML-KEM (FIPS 203) + AES-256-GCM
+  actions:
+    - text: Primeros Pasos
+      link: /getting-started/installation/
+      icon: right-arrow
+      variant: primary
+    - text: Ver en PyPI
+      link: https://pypi.org/project/aegisq-pqc/
+      icon: external
+      variant: secondary
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+:::note[Traducción en curso]
+Esta es la **portada en español** de la documentación de AegisQ. Las páginas individuales del sitio todavía están en inglés; la traducción completa se está publicando por fases. Si necesitás una página específica traducida, abrí un issue en GitHub indicando prioridad.
+:::
+
+## ¿Por qué AegisQ?
+
+AegisQ es una biblioteca criptográfica híbrida que combina **ML-KEM** (FIPS 203) para encapsulación de claves resistente a computadoras cuánticas con **AES-256-GCM** para cifrado simétrico autenticado. El núcleo criptográfico está escrito en Rust para garantizar performance y seguridad, y se expone a Python vía PyO3.
+
+<CardGrid>
+  <Card title="Resistente a Quantum" icon="shield">
+    ML-KEM (FIPS 203), resistente al algoritmo de Shor. Tus datos quedan seguros incluso frente a futuras computadoras cuánticas.
+  </Card>
+  <Card title="Tiempo Constante" icon="approve-check-circle">
+    `subtle::ConstantTimeEq` sin branches que dependan de secretos. Inmune a ataques de canal lateral por timing.
+  </Card>
+  <Card title="Zeroización de Memoria" icon="warning">
+    `zeroize::Zeroize` en todas las estructuras que contienen secretos. Las claves se borran de forma segura después de usarlas.
+  </Card>
+  <Card title="Núcleo en Rust, API en Python" icon="rocket">
+    Performance de Rust con la ergonomía de Python. Cifrá datos de forma segura en 3 líneas de código.
+  </Card>
+  <Card title="Liberación del GIL" icon="forward-slash">
+    `py.detach()` para paralelismo real durante operaciones criptográficas. Sin cuello de botella por el GIL.
+  </Card>
+  <Card title="Tipos Seguros" icon="document">
+    Stubs de tipo PEP 561 con autocompletado completo en el IDE. Detectá errores antes de ejecutar.
+  </Card>
+</CardGrid>
+
+## Más Allá de lo Básico
+
+AegisQ incluye extensiones listas para producción además del flujo híbrido one-shot:
+
+<CardGrid>
+  <Card title="Cifrado en Streaming" icon="stream">
+    Cifrá archivos de gigabytes con memoria acotada usando los generadores `encrypt_stream` / `decrypt_stream`. v1.5.0.
+  </Card>
+  <Card title="API Asíncrona" icon="rocket">
+    `encrypt_async` / `decrypt_async` descargan el trabajo a un thread pool sin bloquear el event loop. v1.4.0.
+  </Card>
+  <Card title="Serialización de Claves" icon="document">
+    Persistencia en PEM, JSON y PEM cifrado, con protección por contraseña vía HKDF-SHA3-256. v1.3.0.
+  </Card>
+  <Card title="Forward Secrecy" icon="seti:forward">
+    `EphemeralSession` destruye automáticamente cada keypair efímero al cerrar — las sesiones pasadas quedan a salvo.
+  </Card>
+  <Card title="Context Manager" icon="seti:config">
+    `with AegisCipher()` zeroiza proactivamente cualquier buffer Python-side registrado al salir del bloque. v1.4.0.
+  </Card>
+  <Card title="Verificado con KAT de NIST" icon="approve-check-circle">
+    Implementación validada contra los vectores de prueba NIST ACVP — coincidencia bit-a-bit con la implementación de referencia.
+  </Card>
+</CardGrid>
+
+## Empezar
+
+> El sitio está **100% en español** 🇪🇸. Si en algún momento necesitás consultar la versión en inglés de una página, usá el switcher de idioma en el header.
+
+### Getting Started
+
+- [Instalación](/es/getting-started/installation/) — instalá desde PyPI o compilá desde el código fuente.
+- [Inicio Rápido](/es/getting-started/quickstart/) — cifrá tu primer payload en 3 líneas.
+
+### Referencia de API
+
+- [AegisCipher](/es/api-reference/aegiscipher/) — clase principal de cifrado híbrido (con streaming, async y context manager).
+- [KeyPair](/es/api-reference/keypair/) — par de claves y métodos de serialización.
+- [MlKem](/es/api-reference/mlkem/) — operaciones KEM crudas para usuarios avanzados.
+- [Niveles de Seguridad](/es/api-reference/security-levels/) — ML-KEM-512, 768 y 1024.
+- [Cifrado en Streaming](/es/api-reference/streaming/) — `encrypt_stream` / `decrypt_stream` para archivos grandes.
+- [Métodos Asíncronos](/es/api-reference/async-methods/) — variantes no bloqueantes.
+- [Context Manager](/es/api-reference/context-manager/) — `with AegisCipher()` y zeroización proactiva.
+- [EphemeralSession](/es/api-reference/ephemeral-session/) — forward secrecy con claves auto-destruidas.
+- [Serialización de Claves](/es/api-reference/key-serialization/) — PEM, JSON y PEM cifrado en disco.
+- [Excepciones](/es/api-reference/exceptions/) — jerarquía completa de errores.
+
+### Internals
+
+- [Arquitectura](/es/internals/architecture/) — cómo encajan el núcleo en Rust, el bridge FFI y la API Python.
+- [Hybrid KEM-DEM](/es/internals/hybrid-kem-dem/) — el flujo de cifrado híbrido en detalle.
+- [Fundamentos Matemáticos](/es/internals/mathematical-foundation/) — M-LWE, NTT y los 3 algoritmos de FIPS 203.
+- [Modelo de Seguridad](/es/internals/security-model/) — garantías de seguridad y limitaciones conocidas.
+
+### Reference
+
+- [Compliance FIPS 203](/es/reference/fips203-compliance/) — roadmap de implementación y dependencias Rust.
+- [Glosario](/es/reference/glossary/) — términos criptográficos y de AegisQ.
+
+:::tip[¿Sos nuevo en criptografía post-cuántica?]
+Si nunca trabajaste con ML-KEM, KEM, o cifrado híbrido, arrancá por la sección [Arquitectura](/es/internals/architecture/) y luego [Hybrid KEM-DEM](/es/internals/hybrid-kem-dem/). Ahí explicamos qué problema resuelve cada componente antes de meternos en el código.
+:::

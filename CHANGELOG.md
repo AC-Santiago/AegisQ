@@ -9,6 +9,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Changed
+- **Version bump en `develop` a `1.6.0-rc1`** — Después de publicar `v1.5.0`
+  a PyPI, `develop` debe estar en la prerelease de la siguiente versión
+  para que los tags `vX.Y.ZrcN` desde `develop` funcionen con `release.yml`
+  (publican en TestPyPI) sin que la metadata choque con la versión ya
+  publicada. Ver `AGENTS.md §12.7` para la convención completa.
+
+  Nota: en `Cargo.toml` y `pyproject.toml` se usa `1.6.0-rc1` (forma
+  SemVer con guión, requerida por Cargo). PEP 440 normaliza esa
+  forma a `1.6.0rc1` para mostrar en `pip` y en `__version__`.
+
 ---
 
 ## [1.5.0] - 2026-08-21
@@ -270,7 +281,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 | `Fixed` | Corrección de bugs |
 | `Security` | Correcciones de seguridad o cambios relevantes para la seguridad |
 
-[Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/AC-Santiago/AegisQ/compare/v1.6.0-rc1...HEAD
 [1.5.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/AC-Santiago/AegisQ/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/AC-Santiago/AegisQ/compare/v1.3.0...v1.3.1

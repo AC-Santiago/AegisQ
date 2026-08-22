@@ -6,6 +6,9 @@ dist/
 # dependencies
 node_modules/
 
+# pnpm 11+ auto-generated allowBuilds policy — each dev/CI configures their own
+pnpm-workspace.yaml
+
 # logs
 npm-debug.log*
 yarn-debug.log*
