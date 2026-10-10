@@ -7,9 +7,13 @@ sidebar:
     variant: tip
 ---
 
-[`AegisCipher`](/api-reference/aegiscipher/) implements the Python **context manager protocol** (`__enter__` / `__exit__`). When the `with` block exits, any Python-side buffer that was registered during the session is **overwritten with zeros in place** before the cipher object is returned to its caller.
+[`AegisCipher`](/api-reference/aegiscipher/) implements the Python **context manager protocol** (`__enter__` / `__exit__`). On exit, mutable buffers registered with its private hook are **overwritten with zeros in place**, the list is cleared, and the cipher is marked inactive.
 
-This is a **forward-compatible hook**: today's public API (`encrypt` / `decrypt` / `encrypt_stream` / `decrypt_stream`) doesn't retain Python-side cryptographic material beyond the call boundary — the shared secret lives in Rust, wrapped in `Zeroizing`, and is wiped when each call returns. The context manager exists so that **future session-aware APIs** (e.g. `bind_session`, multi-message encryption, long-running streams) can register any persistent Python-side buffer and rely on deterministic zeroization on exit, not on the garbage collector.
+The current public methods do not register buffers with this hook. One-shot shared-secret cleanup is performed explicitly in Rust, independently of `with`; it is not implemented with a `Zeroizing` wrapper in `hybrid.rs`. Streaming generators retain native state while iterating.
+
+:::caution[Not a secret-erasure boundary]
+Leaving the block does not erase a generated `KeyPair`, caller-owned `secret_key` bytes, plaintext, or a suspended streaming generator. It does not close the cipher or prevent later calls. See [Security Model](/internals/security-model/) for cleanup limitations.
+:::
 
 ## Basic Usage
 
@@ -36,8 +40,8 @@ The `with` statement:
 |--------|-----------|
 | Exceptions | **Not suppressed** — `__exit__` returns `False`, so any error inside the block propagates to the caller after zeroization runs |
 | Idempotency | Calling `__exit__` (or `_zeroize_session()`) more than once is safe |
-| Nested usage | Each `with AegisCipher() as c:` is a fresh session; nested blocks are allowed but each registers buffers independently |
-| Performance | Zeroization is `O(n)` in the number of registered buffers and their total size; negligible vs. a single AES-GCM operation |
+| Nested usage | Separate cipher instances have separate buffer lists. Re-entering the same instance shares its list; an inner exit clears it and marks the instance inactive |
+| Performance | Cleanup work scales with the number of registered buffers plus their total byte length; no timing benchmark is asserted |
 
 ## `__repr__`
 
@@ -46,12 +50,12 @@ The `with` statement:
 ```python
 >>> cipher = AegisCipher()
 >>> repr(cipher)
-'AegisCipher(level=<SecurityLevel.ML_KEM_768>, inactive)'
+'AegisCipher(level=SecurityLevel.ML_KEM_768, inactive)'
 
 >>> with cipher:
 ...     repr(cipher)
 ...
-'AegisCipher(level=<SecurityLevel.ML_KEM_768>, active)'
+'AegisCipher(level=SecurityLevel.ML_KEM_768, active)'
 ```
 
 This makes it easy to verify in logs and `print()` statements that the cipher is currently inside a session.
@@ -75,13 +79,13 @@ This method is called by `__exit__` and is also safe to call manually (idempoten
 
 ## When Does It Matter?
 
-### Today (v1.5.0)
+### Current behavior
 
-You can use `with AegisCipher() as cipher:` purely as a **documentation / forward-compatibility habit**. There's no observable difference vs. using the cipher without `with`. The shared-secret lifetime is already controlled by Rust `Zeroizing`.
+`with AegisCipher() as cipher:` changes the state displayed by `repr` and invokes the private cleanup hook on exit. It does not change the cryptographic result or erase caller-owned material. One-shot Rust cleanup is independent of the context manager.
 
 ### Future session APIs
 
-When AegisQ ships APIs that retain Python-side material across multiple calls (e.g. a session key bound to a remote peer, or a streaming cipher whose nonce state lives in Python), those APIs will call `_register_session_buffer()` internally. Your existing `with` blocks will then **automatically benefit** without code changes — the registered buffer is zeroized on exit.
+The private registration hook is available for internal use. It is not a public `bind_session` API or a promise about future behavior.
 
 ## Complete Example with Error Handling
 
@@ -103,9 +107,9 @@ try:
         plaintext = cipher.decrypt(package, keypair.secret_key)
 except DecryptionError:
     # __exit__ ran before the exception propagated → buffers zeroized
-    print("decryption failed — already zeroized")
+    print("decryption failed — context exited")
 except AegisQError:
-    print("any other AegisQ error — already zeroized")
+    print("another AegisQ error — context exited")
 
 # Outside the with: cipher is back to "inactive"
 print(repr(cipher))  # AegisCipher(level=..., inactive)
@@ -114,5 +118,5 @@ print(repr(cipher))  # AegisCipher(level=..., inactive)
 ## See Also
 
 - [`AegisCipher`](/api-reference/aegiscipher/) — main class, now with `__enter__` / `__exit__`
-- [`EphemeralSession`](/api-reference/ephemeral-session/) — uses its own context manager to destroy its ephemeral keypair
-- [Security Model](/internals/security-model/) — broader zeroization guarantees
+- [`EphemeralSession`](/api-reference/ephemeral-session/) — closes its session and drops the keypair reference
+- [Security Model](/internals/security-model/) — cleanup mechanisms and limits

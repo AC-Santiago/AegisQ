@@ -1,11 +1,15 @@
 ---
 title: EphemeralSession
-description: Forward secrecy vía keypairs auto-generados
+description: Keypairs de sesión auto-generados, cierre y límites de limpieza.
 ---
 
 ## Descripción General
 
-`EphemeralSession` provee forward secrecy generando un keypair internamente y destruyendo la clave secreta automáticamente al cerrar la sesión.
+`EphemeralSession` genera un keypair internamente, expone su clave pública y usa la privada para descifrar. Cerrar la sesión la marca como cerrada y descarta su referencia al keypair.
+
+:::caution[Sin garantía de borrado seguro ni forward secrecy]
+`close()` no garantiza que se borren todas las copias Rust/Python del secreto. Forward secrecy requiere un protocolo autenticado adecuado y la eliminación segura de claves anteriores; el helper de sesión por sí solo no lo proporciona. Consulte el [modelo de seguridad](/es/internals/security-model/).
+:::
 
 ```python
 from aegisq import EphemeralSession
@@ -19,10 +23,8 @@ with EphemeralSession() as session:
     # descifrar mensajes destinados a esta sesión
     plaintext = session.decrypt(package)
 
-# Al salir del context manager, la clave privada es destruida
+# Al salir se cierra la sesión y se descarta su referencia al keypair
 ```
-
-Esto provee **forward secrecy**: si alguien roba la clave privada guardada, no puede descifrar mensajes anteriores porque las claves efímeras fueron destruidas.
 
 ## Referencia de la API
 
@@ -36,7 +38,7 @@ def __init__(self, level: SecurityLevel = SecurityLevel.ML_KEM_768) -> None
 
 ### `public_key` {#public_key}
 
-Clave pública de solo lectura. La clave secreta nunca se expone.
+Clave pública de solo lectura. No existe un getter público de clave secreta; es encapsulación de API, no protección frente a inspección de código o memoria del proceso. El acceso después del cierre lanza `SessionExpiredError`.
 
 ```python
 session = EphemeralSession()
@@ -67,7 +69,7 @@ Descifra un Transit Package usando la clave secreta efímera.
 def close(self) -> None
 ```
 
-Cierra la sesión y destruye la clave secreta efímera. Es seguro llamarlo múltiples veces.
+Marca la sesión como cerrada y descarta su referencia al keypair. Es idempotente. El acceso posterior a `public_key`, `encrypt()` o `decrypt()` lanza `SessionExpiredError`; `level` sigue siendo legible.
 
 ## Context Manager
 
@@ -77,5 +79,5 @@ Cierra la sesión y destruye la clave secreta efímera. Es seguro llamarlo múlt
 with EphemeralSession() as session:
     package = session.encrypt(b"Datos secretos", session.public_key)
     plaintext = session.decrypt(package)
-# La clave secreta se destruye automáticamente al salir
+# Se cierra automáticamente la sesión; no se garantiza un borrado completo
 ```

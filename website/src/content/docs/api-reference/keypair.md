@@ -40,7 +40,7 @@ The ML-KEM public key as `bytes`. Share it openly.
 
 ### `secret_key`
 
-The ML-KEM secret key as `bytes`. **Never share it.** It is zeroized via Rust `zeroize::Zeroize` when the `KeyPair` is dropped and the GIL is released during every cryptographic operation that touches it.
+The ML-KEM secret key as `bytes`. **Never share or log it.** The getter creates an immutable Python copy. The current Python-facing `KeyPair` does not zeroize its Rust secret buffer on destruction, and deleting a Python `bytes` object does not guarantee erasure. See [Security Model](/internals/security-model/).
 
 | Level | Size |
 |-------|------|
@@ -54,20 +54,20 @@ The `SecurityLevel` the keypair was generated with.
 
 ### `__repr__` (v1.4.0 — safe fingerprint)
 
-The repr intentionally **does not leak** raw bytes or key sizes (sizes alone enable correlation attacks between instances). It returns:
+The repr omits raw key bytes and explicit buffer lengths. It includes the level (which determines key sizes) and a public-key fingerprint. Example for ML-KEM-768:
 
 ```text
-KeyPair(level=<SecurityLevel.ML_KEM_768>, fp=<16-hex>)
+KeyPair(level=MlKem768, fp=<16-hex>)
 ```
 
-Where `<16-hex>` is the first 8 bytes of `SHA3-256(public_key)` in hexadecimal — a stable, non-reversible fingerprint useful for logs.
+`<16-hex>` is the first 8 bytes of `SHA3-256(public_key)` in hexadecimal. It is a stable, truncated identifier, not proof of identity; it can correlate use of the same public key across logs.
 
 ```python
 >>> from aegisq import AegisCipher
 >>> cipher = AegisCipher()
 >>> kp = cipher.generate_keypair()
 >>> repr(kp)
-"KeyPair(level=<SecurityLevel.ML_KEM_768>, fp=a3f1c0b27d4e9f12)"
+"KeyPair(level=MlKem768, fp=a3f1c0b27d4e9f12)"  # Illustrative fingerprint
 ```
 
 ## Public-Key Serialization Methods
@@ -104,20 +104,22 @@ The body uses Base64 STANDARD (not URL-safe). The level **is not encoded** in th
 
 ### `public_key_json() -> str`
 
-Returns the public key as a **self-describing JSON** with `algorithm`, `level`, and `public_key` (Base64 STANDARD) fields. Use this when you want a format that records its own level — useful for archival and interop with non-Python clients.
+Returns the public key as a **self-describing JSON** with `algorithm`, `level`, and `public_key` (**Base64 URL-safe without padding**) fields. The level uses the Python enum name, such as `ML_KEM_768`.
 
 ```json
 {
   "algorithm": "ML-KEM",
-  "level": "ML-KEM-768",
+  "level": "ML_KEM_768",
   "public_key": "6BDM8h...snip..."
 }
 ```
 
 ## Secret-Key Export Methods
 
-:::caution[Secret keys are NEVER exported in plaintext]
-The secret key is encrypted with **AES-256-GCM** using a key derived from your `password` via **HKDF-SHA3-256**. Losing the password means losing the key — there is no recovery mechanism. There is intentionally no API to export the secret key without a password.
+:::caution[Export helpers encrypt; raw access remains available]
+`export_secret_key_raw()` and `export_secret_key_pem()` encrypt with **AES-256-GCM**, using a key derived from `password` via **HKDF-SHA3-256**. Losing that input prevents recovery of the encrypted export. The `secret_key` property still exposes plaintext bytes.
+
+HKDF is not a password-hardening function and does not slow offline guessing like Argon2 or scrypt. Use high-entropy secret bytes from a secret manager or a CSPRNG, not a weak human password. Protect and retain that secret separately.
 :::
 
 ### `export_secret_key_raw(password: bytes) -> bytes`
@@ -134,7 +136,7 @@ Returns the encrypted secret key as a **PEM-like envelope**:
 -----END ENCRYPTED ML-KEM PRIVATE KEY-----
 ```
 
-The body uses Base64 STANDARD. Use [`load_secret_key(path, password=...)`](/api-reference/key-serialization/#load_secret_key) or [`MlKem`](/api-reference/mlkem/) to decrypt.
+The body uses Base64 STANDARD. Use [`load_secret_key(path, password=...)`](/api-reference/key-serialization/#load_secret_key) to decrypt.
 
 ## Complete Example
 
@@ -154,13 +156,14 @@ pem_string: str = keypair.public_key_pem()      # for files (.pem)
 json_string: str = keypair.public_key_json()    # for archival / interop
 
 # Encrypted export of the secret key
-password: bytes = b"correct horse battery staple"
+import secrets
+password: bytes = secrets.token_bytes(32)  # Store securely for later recovery
 sk_pem: str = keypair.export_secret_key_pem(password)
 sk_blob: bytes = keypair.export_secret_key_raw(password)
 
-# Safe to log: only level + fingerprint
+# Contains only level + public fingerprint; consider log correlation
 print(repr(keypair))
-# KeyPair(level=<SecurityLevel.ML_KEM_768>, fp=a3f1c0b27d4e9f12)
+# KeyPair(level=MlKem768, fp=a3f1c0b27d4e9f12)
 ```
 
 ## See Also
@@ -168,4 +171,4 @@ print(repr(keypair))
 - [`AegisCipher.generate_keypair()`](/api-reference/aegiscipher/#generate_keypair) — how to obtain a `KeyPair`
 - [`MlKem.generate_keypair()`](/api-reference/mlkem/#generate_keypair) — same, via the low-level API
 - [Key Serialization helpers](/api-reference/key-serialization/) — `save_*` / `load_*` for file-based persistence
-- [EphemeralSession](/api-reference/ephemeral-session/) — auto-managed keypair with forward secrecy
+- [EphemeralSession](/api-reference/ephemeral-session/) — auto-managed session keypair and lifecycle limits
