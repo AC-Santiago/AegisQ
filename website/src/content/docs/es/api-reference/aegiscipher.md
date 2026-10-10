@@ -5,11 +5,38 @@ description: API de alto nivel para cifrado híbrido — encapsulación de clave
 
 `AegisCipher` es la **API recomendada** para la mayoría de los usuarios. Maneja todo el flujo KEM-DEM híbrido — encapsulación ML-KEM seguida de cifrado AES-256-GCM — detrás de una interfaz simple y ergonómica.
 
-La clase también proporciona cuatro extensiones que cubren la mayoría de escenarios de producción:
+**Por defecto: `SecurityLevel.ML_KEM_768`.** Use el mismo conjunto de parámetros para cifrar y descifrar.
 
-- **[Context Manager](#context-manager)** (`__enter__` / `__exit__`) — zeroización proactiva para APIs de sesión forward-compatibles (v1.4.0).
-- **[Cifrado en Streaming](#cifrado-en-streaming)** (`encrypt_stream` / `decrypt_stream`) — cifrá archivos de cualquier tamaño con memoria acotada (v1.5.0).
-- **[Métodos Asíncronos](#metodos-asincronos)** (`encrypt_async` / `decrypt_async`) — variantes no bloqueantes para code paths de asyncio (v1.4.0).
+## Cifrar y Descifrar
+
+Instale el paquete con Python 3.11 o posterior:
+
+```bash
+python -m pip install aegisq-pqc
+```
+
+```python
+from aegisq import AegisCipher
+
+cipher = AegisCipher()  # ML-KEM-768 by default
+keypair = cipher.generate_keypair()
+
+package = cipher.encrypt(b"Hello, AegisQ", keypair.public_key)
+plaintext = cipher.decrypt(package, keypair.secret_key)
+assert plaintext == b"Hello, AegisQ"
+```
+
+Obtenga las claves públicas mediante un canal confiable. AES-GCM autentica el
+payload, no la identidad del emisor. AegisQ es software beta; usar algoritmos
+estandarizados no demuestra certificación del producto ni una auditoría
+independiente. Consulte el [modelo de seguridad](/es/internals/security-model/)
+antes de usarlo con datos sensibles.
+
+La clase también proporciona tres interfaces adicionales:
+
+- **[Context Manager](#context-manager)** (`__enter__` / `__exit__`) — limpieza de buffers mutables registrados internamente (v1.4.0), no claves del llamador.
+- **[Cifrado en Streaming](#cifrado-en-streaming)** (`encrypt_stream` / `decrypt_stream`) — procesamiento de archivos grandes en bloques acotados (v1.5.0).
+- **[Métodos Asíncronos](#métodos-asíncronos)** (`encrypt_async` / `decrypt_async`) — wrappers de thread pool para asyncio.
 
 ## Firma de la Clase
 
@@ -34,7 +61,7 @@ class AegisCipher:
         ciphertext_chunks: Iterable[bytes],
     ) -> Iterator[bytes]
 
-    # Asíncrono (v1.4.0)
+    # Asíncrono
     async def encrypt_async(self, plaintext: bytes, recipient_public_key: bytes) -> bytes
     async def decrypt_async(self, encrypted_package: bytes, secret_key: bytes) -> bytes
 
@@ -70,7 +97,7 @@ Genera un nuevo keypair ML-KEM para el nivel de seguridad configurado.
 ```python
 keypair = cipher.generate_keypair()
 # keypair.public_key  → compartir abiertamente
-# keypair.secret_key  → mantener privado, zeroizado al eliminar
+# keypair.secret_key  → mantener privado; eliminar bytes inmutables no garantiza borrado
 # keypair.level       → el SecurityLevel usado
 ```
 
@@ -106,7 +133,7 @@ Descifra un Transit Package cifrado usando la clave secreta del receptor. Intern
 
 ## KeyPair
 
-El objeto `KeyPair` retornado por `generate_keypair()`. Para documentación completa ver [referencia KeyPair](/api-reference/keypair/).
+El objeto `KeyPair` retornado por `generate_keypair()`. Para documentación completa ver [referencia KeyPair](/es/api-reference/keypair/).
 
 ### Propiedades
 
@@ -119,13 +146,13 @@ class KeyPair:
 
 ### `__repr__` (v1.4.0 — fingerprint seguro)
 
-El repr **no filtra** bytes crudos ni tamaños de claves. Retorna:
+El repr omite bytes crudos y longitudes explícitas. El nivel sigue identificando los tamaños de los parámetros. Ejemplo para ML-KEM-768:
 
 ```text
-KeyPair(level=<SecurityLevel.ML_KEM_768>, fp=<16-hex>)
+KeyPair(level=MlKem768, fp=<16-hex>)
 ```
 
-`<16-hex>` son los primeros 8 bytes de `SHA3-256(public_key)` — un fingerprint estable y no reversible.
+`<16-hex>` son los primeros 8 bytes de `SHA3-256(public_key)`: un identificador público truncado estable, no autenticación de identidad. Permite correlacionar el uso de una clave entre logs.
 
 ### Métodos de serialización (v1.3.0)
 
@@ -139,7 +166,7 @@ Para transporte por archivo/red, `KeyPair` expone:
 | `export_secret_key_raw(password)` | `bytes` | Blob opaco cifrado con AES-256-GCM (HKDF-SHA3-256) |
 | `export_secret_key_pem(password)` | `str` | PEM-like `-----BEGIN ENCRYPTED ML-KEM PRIVATE KEY-----` |
 
-Para helpers de persistencia basada en archivos (`save_*` / `load_*`), ver [Serialización de Claves](/api-reference/key-serialization/).
+Para helpers de persistencia basada en archivos (`save_*` / `load_*`), ver [Serialización de Claves](/es/api-reference/key-serialization/).
 
 ## Cifrado en Streaming
 
@@ -169,13 +196,11 @@ El Transit Package en modo stream se autodelimita:
 
 El nonce AES-GCM de cada chunk se deriva de su índice (`i.to_be_bytes() || base_nonce[4..12]`) y su AAD es el índice de chunk de 4 bytes en big-endian — previniendo ataques de reordenamiento de chunks.
 
-Documentación completa: [Cifrado en Streaming](/api-reference/streaming/).
+Documentación completa: [Cifrado en Streaming](/es/api-reference/streaming/).
 
 ## Métodos Asíncronos
 
-:::note[v1.4.0]
-`encrypt_async` y `decrypt_async` fueron introducidos en v1.4.0.
-:::
+`encrypt_async` y `decrypt_async` delegan sus equivalentes síncronos. `generate_keypair()` sigue siendo síncrono y puede bloquear el event loop si se llama directamente desde una coroutine.
 
 Variantes no bloqueantes de `encrypt()` / `decrypt()` para código asyncio. Ejecutan la implementación sincrónica en el `ThreadPoolExecutor` por defecto, así el event loop queda responsive incluso con payloads grandes.
 
@@ -185,7 +210,7 @@ from aegisq import AegisCipher
 
 async def main():
     cipher = AegisCipher()
-    keypair = cipher.generate_keypair()
+    keypair = await asyncio.to_thread(cipher.generate_keypair)
 
     package = await cipher.encrypt_async(b"secreto", keypair.public_key)
     plaintext = await cipher.decrypt_async(package, keypair.secret_key)
@@ -194,7 +219,7 @@ async def main():
 asyncio.run(main())
 ```
 
-Documentación completa: [Métodos Asíncronos](/api-reference/async-methods/).
+Documentación completa: [Métodos Asíncronos](/es/api-reference/async-methods/).
 
 ## Context Manager
 
@@ -202,7 +227,7 @@ Documentación completa: [Métodos Asíncronos](/api-reference/async-methods/).
 El protocolo `__enter__` / `__exit__` fue introducido en v1.4.0.
 :::
 
-`AegisCipher` puede usarse dentro de un bloque `with`. Al salir, cualquier buffer Python-side registrado durante la sesión es **sobrescrito con ceros in-place**. La API pública actual no retiene material Python-side, así que esto es un hook forward-compatible — pero no cuesta nada usarlo.
+`AegisCipher` puede usarse dentro de un bloque `with`. Al salir, sobrescribe buffers mutables registrados con su hook privado. Los métodos públicos actuales no registran buffers allí. No borra claves/plaintext del llamador ni cierra un stream suspendido; tampoco impide nuevas llamadas al cipher.
 
 ```python
 from aegisq import AegisCipher
@@ -217,15 +242,15 @@ with AegisCipher() as cipher:
 
 ```python
 >>> repr(cipher)
-'AegisCipher(level=<SecurityLevel.ML_KEM_768>, inactive)'
+'AegisCipher(level=SecurityLevel.ML_KEM_768, inactive)'
 
 >>> with cipher:
 ...     repr(cipher)
 ...
-'AegisCipher(level=<SecurityLevel.ML_KEM_768>, active)'
+'AegisCipher(level=SecurityLevel.ML_KEM_768, active)'
 ```
 
-Documentación completa: [Context Manager](/api-reference/context-manager/).
+Documentación completa: [Context Manager](/es/api-reference/context-manager/).
 
 ## Ejemplo Completo
 
@@ -236,11 +261,11 @@ from aegisq import AegisCipher, SecurityLevel
 cipher_bob = AegisCipher(level=SecurityLevel.ML_KEM_768)
 keypair = cipher_bob.generate_keypair()
 public_key: bytes = keypair.public_key   # 1184 bytes — compartir con cualquiera
-secret_key: bytes = keypair.secret_key   # 2400 bytes — NUNCA compartir, zeroizado al del
+secret_key: bytes = keypair.secret_key   # 2400 bytes — no compartir ni registrar
 
 # 2. Alice (emisor) cifra usando la clave pública de Bob
 cipher_alice = AegisCipher(level=SecurityLevel.ML_KEM_768)
-payload = b"Registros médicos ultra secretos"
+payload = "Registros médicos ultra secretos".encode("utf-8")
 encrypted_package: bytes = cipher_alice.encrypt(
     plaintext=payload,
     recipient_public_key=public_key,
