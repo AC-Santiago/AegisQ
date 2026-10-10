@@ -14,11 +14,11 @@ description: Glossary of cryptographic and AegisQ-specific terms, plus reference
 | **M-LWE** | Module Learning With Errors — the hard lattice problem underlying ML-KEM's quantum resistance. |
 | **NTT** | Number Theoretic Transform — FFT over finite fields for O(n log n) polynomial multiplication. |
 | **CBD** | Centered Binomial Distribution — used to sample small error terms in ML-KEM key generation. |
-| **Implicit Rejection** | ML-KEM Decaps returns a pseudorandom key (not an error) when the capsule is invalid. Prevents CCA oracle attacks. |
+| **Implicit Rejection** | ML-KEM Decaps returns a pseudorandom key for invalid contents of a correctly sized capsule, rather than a validity error. Structural size errors remain distinct. |
 | **Transit Package** | The complete byte array sent over the network: `[Capsule \| Nonce \| Tag \| Ciphertext]`. |
 | **Zeroization** | Securely overwriting sensitive memory (keys, secrets) with zeros before deallocation. |
-| **Auth Tag** | AES-GCM's 16-byte cryptographic MAC. A tag mismatch means the ciphertext was tampered with. |
-| **Forward Secrecy** | Property that compromising a long-term secret does not compromise past session keys. AegisQ's [`EphemeralSession`](/api-reference/ephemeral-session/) achieves this by destroying each ephemeral key after use. |
+| **Auth Tag** | AES-GCM's 16-byte authentication tag. Verification can fail due to tampering, a wrong key, or an invalid capsule; it does not prove sender identity. |
+| **Forward Secrecy** | Compromise of a long-term secret does not compromise past session keys. [`EphemeralSession`](/api-reference/ephemeral-session/) manages session keys but does not alone guarantee this protocol property or secure erasure. |
 
 ## Streaming Encryption Terms (v1.5.0)
 
@@ -38,9 +38,9 @@ description: Glossary of cryptographic and AegisQ-specific terms, plus reference
 | **PEM** | Privacy-Enhanced Mail envelope: ASCII-armored key with `-----BEGIN ... -----` / `-----END ... -----` headers. AegisQ uses an adapted form (RFC 7468). |
 | **JSON Key** | Self-describing key format with `algorithm`, `level`, and `public_key` fields. Useful when the level cannot be conveyed out of band. |
 | **Base64 URL-safe** | Base64 variant that uses `-` and `_` instead of `+` and `/`, and omits `=` padding. Suitable for HTTP headers, URLs, and env vars. |
-| **HKDF** | HMAC-based Key Derivation Function (RFC 5869). AegisQ uses HKDF-SHA3-256 to derive an AES key from a user-supplied password. |
-| **Key Wrap** | Encrypting a key under another key. AegisQ uses AES-256-GCM with an HKDF-SHA3-256-derived key from a password. |
-| **Fingerprint** | Stable, non-reversible identifier for a public key: first 8 bytes of `SHA3-256(public_key)` in hex. Used by `KeyPair.__repr__` (v1.4.0) to log without leaking raw bytes. |
+| **HKDF** | HMAC-based Key Derivation Function (RFC 5869). AegisQ uses HKDF-SHA3-256 for key wrapping. It is not a password-hardening function; use high-entropy secret input. |
+| **Key Wrap** | Encrypting a key under another key. AegisQ uses AES-256-GCM with a key derived from high-entropy secret input by HKDF-SHA3-256; the API argument is named `password`. |
+| **Fingerprint** | Truncated public-key identifier: first 8 bytes of `SHA3-256(public_key)` in hex. Used by `KeyPair.__repr__`; not identity authentication, and it enables log correlation. |
 | **Magic** | Internal byte sequence marking an AegisQ encrypted key blob. Validated on load to catch format mismatch. |
 
 ## References

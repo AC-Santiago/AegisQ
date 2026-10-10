@@ -1,11 +1,15 @@
 ---
 title: Compliance FIPS 203
-description: Roadmap de implementación, cumplimiento de estándares e inventario de dependencias Rust de AegisQ hasta v1.5.0.
+description: Historial de implementación, referencias normativas, dependencias y alcance de los vectores de prueba.
 ---
 
 ## Roadmap de Implementación
 
-AegisQ fue desarrollado en fases. Cada fase debía pasar todos sus tests antes de avanzar a la siguiente. La release estable actual es **v1.5.0**; `develop` está rastreando **v1.6.0-rc1** (la próxima prerelease).
+AegisQ se desarrolló por fases. Las tablas describen componentes implementados y releases históricas, no una certificación ni el resultado de una ejecución actual de tests. Las versiones publicadas están en [PyPI](https://pypi.org/project/aegisq-pqc/); los manifiestos declaran la versión del checkout y `CHANGELOG.md` registra el historial.
+
+:::caution[Implementación no significa certificación]
+FIPS 203 especifica ML-KEM. Implementarlo y ejecutar tests de respuesta conocida no constituye una validación ACVP oficial, certificación FIPS 140 del módulo ni una auditoría independiente de AegisQ. El formato de frames de streaming y los sobres PEM-like de ML-KEM son formatos de AegisQ, no estándares definidos por las referencias siguientes.
+:::
 
 ### v1.0–v1.2 — Core FIPS 203 ML-KEM + Hybrid KEM-DEM
 
@@ -39,7 +43,7 @@ AegisQ fue desarrollado en fases. Cada fase debía pasar todos sus tests antes d
 | 26 | GitHub Actions CI/CD | — | ✅ |
 | 27 | Archivos JSON con vectores NIST ACVP KAT | vectores NIST | ✅ |
 | 27b | Tests de verificación de vectores KAT | vectores NIST | ✅ |
-| 28 | EphemeralSession (forward secrecy) | — | ✅ |
+| 28 | EphemeralSession (ciclo de vida del keypair de sesión) | — | ✅ |
 | 29 | Soporte async (`encrypt_async`, `decrypt_async`) | — | ✅ |
 
 ### v1.3.0 — KDF, Key Wrap y Serialización de Claves
@@ -59,7 +63,7 @@ AegisQ fue desarrollado en fases. Cada fase debía pasar todos sus tests antes d
 
 | Fase | Componente | Referencia | Estado |
 |------|------------|------------|--------|
-| 33a | Cifrado/descifrado en streaming (`stream.rs`, `stream_bindings.rs`, `encrypt_stream` / `decrypt_stream`) | NIST SP 800-38D §5.2 (AEAD basado en frames) | ✅ |
+| 33a | Cifrado/descifrado en streaming (`stream.rs`, `stream_bindings.rs`, `encrypt_stream` / `decrypt_stream`) | Primitiva AES-GCM: SP 800-38D; framing: específico de AegisQ | ✅ |
 | 33b | Benchmarks de Criterion para NTT y KEM (`benches/ntt.rs`, `benches/kem.rs`) | — | ✅ |
 
 ## Cumplimiento de Estándares
@@ -75,12 +79,12 @@ AegisQ fue desarrollado en fases. Cada fase debía pasar todos sus tests antes d
 
 ## Dependencias Rust
 
-Las versiones reflejan la release **v1.5.0**. Las declaraciones del workspace viven en `Cargo.toml`.
+Las versiones son requisitos de los manifiestos actuales, no resoluciones exactas del lockfile ni un inventario histórico de v1.5.0. Las declaraciones compartidas viven en `Cargo.toml`; PyO3 y Criterion están en los manifiestos del bridge/core. `Cargo.lock` registra las versiones resueltas.
 
 | Crate | Versión | Propósito | `no_std` |
 |-------|---------|-----------|----------|
 | `aes-gcm` | 0.11 | AES-256-GCM cifrado autenticado (hardware AES-NI) | ✅ |
-| `sha3` | 0.12 | SHA3-256/512 y SHAKE-128/256 para ML-KEM | ✅ |
+| `sha3` | 0.12 | SHA3-256/512 para ML-KEM | ✅ |
 | `shake` | 0.1 | Variantes XOF movidas fuera de `sha3` upstream (RustCrypto/XOFs split) | ✅ |
 | `zeroize` | 1.9 | Borrado seguro de memoria de secretos | ✅ |
 | `subtle` | 2.6 | Comparaciones en tiempo constante | ✅ |
@@ -99,4 +103,6 @@ AegisQ verifica su implementación de ML-KEM contra los vectores de prueba ofici
 - **KeyGen** — `tests/python/json-files/ML-KEM-keyGen-FIPS203/`
 - **Encap/Decap** — `tests/python/json-files/ML-KEM-encapDecap-FIPS203/`
 
-El test runner `tests/python/test_kat_vectors.py` parsea cada vector JSON y verifica igualdad bit-a-bit entre la salida de la implementación y los bytes esperados. Esta es la señal de correctitud más fuerte posible — correr AegisQ contra los mismos vectores que NIST usa para certificar implementaciones de referencia.
+`tests/python/test_kat_vectors.py` compara explícitamente las salidas esperadas de KeyGen y encapsulación byte por byte. No invoca la desencapsulación ni verifica las salidas esperadas de desencapsulación/rechazo del corpus combinado. `tests/python/test_kem_api.py` comprueba roundtrips por separado y `tests/python/test_implicit_rejection.py` cubre contenido inválido de capsules. Esos tests no sustituyen los tests de respuesta conocida de desencapsulación.
+
+Superar estos tests aporta evidencia de corrección para las entradas comprobadas, no una prueba de seguridad, cobertura exhaustiva ni certificación oficial. Cualquier afirmación de éxito debe referirse a una ejecución real con el código y la extensión nativa correspondientes.

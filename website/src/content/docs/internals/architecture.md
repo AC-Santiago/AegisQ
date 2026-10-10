@@ -10,9 +10,9 @@ AegisQ enforces strict separation between three architectural layers. **Violatin
 ```text
 ╔═══════════════════════════════════════════════════════════════╗
 ║  LAYER 3: Python API (aegisq/)                                ║
-║  �─────────────────────────────────────────────────────────┐  ║
+║  ┌─────────────────────────────────────────────────────────┐  ║
 ║  │  AegisCipher — encrypt / decrypt / stream / async / ctx │  ║
-║  │  EphemeralSession — forward-secrecy ephemeral keys      │  ║
+║  │  EphemeralSession — session keypair lifecycle           │  ║
 ║  │  MlKem — raw KEM for advanced users                     │  ║
 ║  │  aegisq.keys — PEM/JSON/encrypted file persistence      │  ║
 ║  │  Exception hierarchy + PEP 561 type stubs               │  ║
@@ -21,20 +21,20 @@ AegisQ enforces strict separation between three architectural layers. **Violatin
 ║  LAYER 2: FFI Bridge (crates/aegisq-pyo3/)                    ║
 ║  ┌─────────────────────────────────────────────────────────┐  ║
 ║  │  PyO3 bindings (#[pyfunction], #[pyclass])              │  ║
-║  │  Zero-copy data passing (&[u8] → Python bytes)          │  ║
+║  │  Borrowed inputs (&[u8]); copied Python bytes outputs   │  ║
 ║  │  GIL release (py.detach) for crypto operations          │  ║
 ║  │  NO cryptographic logic — pure translation layer        │  ║
 ║  └─────────────────────────────────────────────────────────┘  ║
 ╠═══════════════════════════════════════════════════════════════╣
 ║  LAYER 1: Rust Core (crates/aegisq-core/)                     ║
-║  �─────────────────────────────────────────────────────────┐  ║
+║  ┌─────────────────────────────────────────────────────────┐  ║
 ║  │  FIPS 203 ML-KEM (KeyGen, Encaps, Decaps + math)        │  ║
 ║  │  AES-256-GCM authenticated encryption                   │  ║
 ║  │  HKDF-SHA3-256 + encrypted secret-key wrap              │  ║
 ║  │  Transit Package (one-shot + streaming formats)         │  ║
-║  │  #![no_std] compatible — constant-time — zeroize        │  ║
+║  │  #![no_std] + alloc — subtle — scoped zeroization       │  ║
 ║  │  NO knowledge of Python or FFI                          │  ║
-║  └─────────────────────────────────────────────────────────┘  �
+║  └─────────────────────────────────────────────────────────┘  ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
 
@@ -58,10 +58,10 @@ Implements all cryptographic math in pure Rust with `no_std` compatibility. It h
 Translates Rust types to Python types via PyO3 and releases the GIL during expensive operations.
 
 - `#[pyfunction]` and `#[pyclass]` bindings
-- Zero-copy data passing (`&[u8]` ↔ Python `bytes`)
+- Borrowed byte-slice inputs (`&[u8]`); `PyBytes::new` copies native outputs and key getter results
 - GIL release via `py.detach()` for crypto operations
-- PyO3 `StreamEncryptor` / `StreamDecryptor` classes with `__call__`-style method binding
-- PyO3 types (`KeyPair`, `SecurityLevel`) with safe `__repr__` exposing only a SHA3-256 fingerprint
+- Native streaming classes with explicit methods (`encrypt_chunk`, `finalize`, `decrypt_chunk`, `process_eof`) used by Python generators
+- PyO3 types `KeyPair` and `SecurityLevel`; keypair repr contains the level and a truncated public-key fingerprint, not secret bytes
 - **No cryptographic logic** — pure translation layer
 
 ### Layer 3: Python API (`aegisq/`)
@@ -69,7 +69,7 @@ Translates Rust types to Python types via PyO3 and releases the GIL during expen
 Provides the ergonomic Python classes that end users interact with.
 
 - `AegisCipher` — High-level encrypt/decrypt/streaming/async/context-manager API
-- `EphemeralSession` — Forward secrecy via auto-managed ephemeral keypairs
+- `EphemeralSession` — Auto-managed session keypair; closure drops its reference, without a complete secure-erasure guarantee
 - `MlKem` — Raw KEM operations for advanced users
 - `aegisq.keys` — File-oriented key persistence (PEM, JSON, encrypted PEM)
 - `SecurityLevel` — Enum for ML-KEM parameter sets
@@ -130,7 +130,7 @@ aegisq/
 │   ├── cipher.py                   # AegisCipher — main high-level API
 │   ├── kem.py                      # MlKem — raw KEM operations
 │   ├── keys.py                     # File-based key persistence (v1.3.0)
-│   ├── session.py                  # EphemeralSession — forward secrecy
+│   ├── session.py                  # EphemeralSession — session lifecycle
 │   ├── exceptions.py               # AegisQError hierarchy (+ SessionExpiredError)
 │   └── py.typed                    # PEP 561 marker
 │
@@ -170,7 +170,7 @@ aegisq/
 
 ## Why Three Layers?
 
-- **Testability** — Each layer can be tested in isolation. The Rust core ships ~50 unit tests in `#[cfg(test)]` modules that don't touch Python. The PyO3 bridge has its own integration tests. The Python API has end-to-end tests with pytest.
+- **Testability** — Each layer can be tested in isolation. Rust unit tests live in `#[cfg(test)]` modules without Python. The bridge and Python API have integration and end-to-end tests under `tests/python/`.
 - **Auditability** — Cryptographic review focuses on Layer 1. FFI correctness review focuses on Layer 2. Ergonomics review focuses on Layer 3.
 - **Portability** — Layer 1 is `no_std` + `alloc`. A future Node.js / Go / WASM binding is a Layer 2 rewrite, not a Layer 1 rewrite.
-- **Performance** — Zero-copy byte passing (`&[u8]` ↔ Python `bytes`) and GIL release (`py.detach()`) keep Python ergonomics without sacrificing multi-core throughput.
+- **Performance** — Borrowed inputs avoid unnecessary input copies and `py.detach()` permits other Python threads to run during expensive native work. Outputs still require Python allocations; this architecture alone is not a benchmark or a guarantee of multi-core scaling.
