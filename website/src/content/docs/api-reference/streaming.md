@@ -11,7 +11,7 @@ sidebar:
 
 ## Why Streaming?
 
-`encrypt()` / `decrypt()` load the entire plaintext into memory at once. For a 4 GiB video file that's 4 GiB of resident Python bytes plus AES-GCM intermediate buffers. The streaming API keeps memory bounded to **one chunk at a time**, regardless of the total payload size.
+The one-shot API processes complete byte buffers. Streaming processes bounded plaintext chunks, but decryption also buffers and copies incoming ciphertext fragments. Memory depends on the caller's chunk sizes and buffering; passing a complete multi-gigabyte input as one chunk defeats the benefit.
 
 ## API
 
@@ -32,9 +32,9 @@ Encrypts an iterable of plaintext chunks and yields ciphertext chunks.
 |-----------|------|---------|-------------|
 | `recipient_public_key` | `bytes` | — | Recipient's ML-KEM public key. |
 | `plaintext_chunks` | `Iterable[bytes]` | — | Any iterable producing plaintext chunks (typically a file iterator). |
-| `chunk_size` | `int` | `65536` (64 KiB) | Maximum ciphertext size per yielded chunk. Range: `1..=16 MiB`. |
+| `chunk_size` | `int` | `65536` (64 KiB) | Maximum plaintext/ciphertext payload per data frame, excluding its 4-byte length and 16-byte tag. Range: `1..=16 MiB`. |
 
-**Yields:** `bytes` chunks that form a complete Transit Package in stream mode.
+**Yields:** a header, data frames, and an EOF frame, as `bytes`. Exhaust the generator to emit EOF. Do not yield empty plaintext chunks: a zero-length frame is interpreted as EOF. An empty iterable represents an empty payload.
 
 **Raises:** `InvalidParameterError` if a plaintext chunk exceeds `chunk_size` or `chunk_size` is out of range; `RngError` if the OS CSPRNG is unavailable.
 
@@ -55,7 +55,11 @@ Decrypts an iterable of ciphertext chunks and yields plaintext chunks.
 | `secret_key` | `bytes` | — | Recipient's ML-KEM secret key. |
 | `ciphertext_chunks` | `Iterable[bytes]` | — | Any iterable producing ciphertext chunks (typically a file iterator). |
 
-**Yields:** `bytes` plaintext chunks.
+**Yields:** individually authenticated plaintext chunks, before the stream's EOF is verified. Exhaust the iterator before treating the payload as complete.
+
+:::caution[Completion and framing]
+An early stop can miss a later authentication or truncation error. Stage output and publish it only after full iteration succeeds. The current decoder stops at the first authenticated EOF; it does not reject trailing bytes or concatenate multiple packages. Enforce message boundaries separately.
+:::
 
 **Raises:** `DecryptionError` if an AES-GCM tag does not verify, if the EOF marker is missing or invalid, or if the stream header is truncated; `InvalidParameterError` if the header is malformed or the secret key has the wrong size.
 
@@ -97,7 +101,7 @@ Each chunk `i` (zero-indexed) gets a 12-byte nonce derived from the header's `ba
 nonce_i = i.to_be_bytes() || base_nonce[4..12]
 ```
 
-- `i.to_be_bytes()` is 4 bytes (uint32 big-endian) — supports up to 2³² chunks per stream
+- `i.to_be_bytes()` is a 4-byte uint32 big-endian index; EOF also consumes an index. Do not treat this as an unlimited-stream guarantee or exhaust the counter
 - `base_nonce[4..12]` is 8 bytes from the random base nonce generated at header time
 
 ### AAD (Additional Authenticated Data)
@@ -135,10 +139,14 @@ with open("video.mp4", "rb") as src, open("video.aegisq", "wb") as out:
         out.write(ct_chunk)
 
 # Decrypt: encrypted file → recovered file
-with open("video.aegisq", "rb") as src, open("video.recovered.mp4", "wb") as out:
+with open("video.aegisq", "rb") as src, open("video.recovered.partial", "wb") as out:
     chunk_iter = iter(lambda: src.read(CHUNK), b"")
     for pt_chunk in cipher.decrypt_stream(keypair.secret_key, chunk_iter):
         out.write(pt_chunk)
+
+# Only after full iteration verifies EOF. On failure, do not publish the partial file.
+from pathlib import Path
+Path("video.recovered.partial").replace("video.recovered.mp4")
 ```
 
 ## Limits and Edge Cases
@@ -146,7 +154,7 @@ with open("video.aegisq", "rb") as src, open("video.recovered.mp4", "wb") as out
 | Limit | Value | Notes |
 |-------|-------|-------|
 | `chunk_size` range | `1..=16 MiB` | Out-of-range raises `InvalidParameterError` |
-| Max chunks per stream | 2³² (4.29 billion) | Bounded by 4-byte nonce derivation |
+| Chunk index | uint32 | EOF needs an additional index; do not exhaust the counter |
 | Header size | capsule + 16 B | 784/1104/1584 B for ML-KEM-512/768/1024 |
 | Per-frame overhead | 4 + 16 = 20 B | Length prefix + tag |
 | Read alignment | None required | `decrypt_stream` re-assembles frames across chunk boundaries |
@@ -167,10 +175,10 @@ Because AAD is `chunk_index.to_be_bytes()`, swapping two frames causes their tag
 
 ## Why Generators (and not coroutines)?
 
-The streaming API uses Python generators (`yield`) rather than async coroutines. The reason is **memory locality**: AES-GCM operations release the GIL in Rust, so streaming encryption saturates multi-core CPUs even from a single generator. If you need non-blocking I/O for the surrounding read/write loop, wrap the file iteration in `asyncio.to_thread` or use `aiofiles` separately.
+Generators expose incremental processing and let the caller control I/O. Native AES-GCM operations release the GIL, but a single generator still processes chunks sequentially; GIL release does not imply multi-core saturation. For an asyncio application, offload the complete synchronous read/encrypt/write loop to a worker, rather than only constructing a lazy generator in that worker.
 
 ## See Also
 
 - [`AegisCipher.encrypt_async` / `decrypt_async`](/api-reference/async-methods/) — non-blocking one-shot variants
-- [`AegisCipher` context manager](/api-reference/context-manager/) — proactive zeroization for session-scoped material
+- [`AegisCipher` context manager](/api-reference/context-manager/) — private buffer cleanup and its limits
 - [Hybrid KEM-DEM internals](/internals/hybrid-kem-dem/) — how the Transit Package is structured
