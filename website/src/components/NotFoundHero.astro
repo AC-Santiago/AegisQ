@@ -1,0 +1,52 @@
+---
+const { locale, siteTitleHref, entry } = Astro.locals.starlightRoute;
+const spanish = locale === 'es';
+const prefix = `${import.meta.env.BASE_URL}${spanish ? 'es/' : ''}`;
+const copy = spanish ? {
+  explanation: 'Esta dirección no lleva a ninguna página. Puede que el enlace haya cambiado o que la URL esté incompleta.',
+  home: 'Volver a AegisQ', docs: 'Abrir la documentación',
+  search: 'También puede buscar lo que necesita desde la cabecera.',
+  paths: 'Retomar el camino', quick: 'Inicio rápido', api: 'Referencia de API', security: 'Modelo de seguridad',
+} : {
+  explanation: 'There is no page at this address. The link may have changed, or the URL may be incomplete.',
+  home: 'Back to AegisQ', docs: 'Open the documentation',
+  search: 'You can also use the search in the header to find what you need.',
+  paths: 'Pick up the thread', quick: 'Quick start', api: 'API reference', security: 'Security model',
+};
+---
+
+<section class="aq-not-found" aria-labelledby="_top">
+  <div class="aq-error-code" aria-hidden="true">404</div>
+  <div class="aq-error-message">
+    <h1 id="_top" data-page-title>{entry.data.title}</h1>
+    <p>{copy.explanation}</p>
+    <div class="aq-error-actions">
+      <a class="aq-open-docs" href={siteTitleHref}>{copy.home}</a>
+      <a href={`${prefix}getting-started/installation/`}>{copy.docs}</a>
+    </div>
+    <p class="aq-error-search">{copy.search}</p>
+  </div>
+  <nav class="aq-error-paths" aria-label={copy.paths}>
+    <a href={`${prefix}getting-started/quickstart/`}>{copy.quick}</a>
+    <a href={`${prefix}api-reference/aegiscipher/`}>{copy.api}</a>
+    <a href={`${prefix}internals/security-model/`}>{copy.security}</a>
+  </nav>
+</section>
+
+<style>
+  .aq-not-found { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 3rem 4rem; align-items: center; max-width: 68rem; margin-inline: auto; padding-block: clamp(2rem, 7vw, 6rem) 2rem; }
+  .aq-error-code { color: var(--aq-accent); font-size: clamp(8rem, 18vw, 16rem); font-weight: 500; line-height: 0.9; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+  h1 { font-size: clamp(2.5rem, 4.5vw, 3.5rem); font-weight: 600; line-height: 1.08; letter-spacing: -0.035em; text-wrap: balance; }
+  .aq-error-message > p { max-width: 48ch; margin-top: 1.25rem; color: var(--aq-text-muted); line-height: 1.75; }
+  .aq-error-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.5rem; margin-top: 1.75rem; }
+  .aq-error-actions .aq-open-docs { margin: 0; }
+  .aq-error-actions > a:not(.aq-open-docs), .aq-error-paths a { color: var(--aq-accent); text-underline-offset: 0.25em; }
+  .aq-error-message .aq-error-search { font-size: 0.875rem; }
+  .aq-error-paths { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; border-top: 1px solid var(--aq-border); padding-top: 1.25rem; margin-top: 1rem; }
+  .aq-error-paths a { padding-block: 0.625rem; font-size: 0.9375rem; }
+  @media (max-width: 49.99rem) {
+    .aq-not-found { grid-template-columns: minmax(0, 1fr); gap: 2rem; padding-top: 1rem; }
+    .aq-error-code { font-size: clamp(7rem, 30vw, 10rem); }
+    .aq-error-paths { grid-column: auto; gap: 0.5rem 1.5rem; margin-top: 0; }
+  }
+</style>
