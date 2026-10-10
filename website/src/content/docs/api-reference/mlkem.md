@@ -13,6 +13,7 @@ class MlKem:
     def generate_keypair(self) -> KeyPair
     def encapsulate(self, public_key: bytes) -> tuple[bytes, bytes]
     def decapsulate(self, capsule: bytes, secret_key: bytes) -> bytes
+    def load_public_key_b64(self, b64: str, level: SecurityLevel | None = None) -> bytes
 ```
 
 ## Constructor
@@ -63,10 +64,27 @@ Performs ML-KEM decapsulation: recovers the 32-byte shared secret from a capsule
 **Returns:** `bytes` — The 32-byte shared secret
 
 :::caution[Implicit Rejection]
-`decapsulate()` **never raises an error** for invalid capsules. Instead, it returns a pseudorandom key (derived from the secret key's rejection seed `z`). This is the **implicit rejection** mechanism defined in FIPS 203 Algorithm 17 — it prevents Chosen Ciphertext Attacks (CCA) via oracle queries.
+`decapsulate()` does not raise a validity error for invalid **contents of a correctly sized capsule**. It returns `J(z || c)`, a pseudorandom key derived with SHAKE256. Incorrect key or capsule sizes raise `InvalidParameterError`. This distinguishes **implicit rejection** (FIPS 203 Algorithm 17) from structural validation.
 
 If you're using `MlKem` directly, you must handle this behavior yourself. `AegisCipher` handles it automatically: an invalid capsule produces a wrong AES-GCM key, which causes `DecryptionError` on tag verification.
 :::
+
+### `load_public_key_b64(b64, level=None)`
+
+```python
+def load_public_key_b64(self, b64: str, level: SecurityLevel | None = None) -> bytes
+```
+
+Decodes a Base64 URL-safe public key, with or without `=` padding. If `level` is `None`, validation uses this instance's configured level. Returns the decoded `bytes`.
+
+**Raises:** `AegisQError` for invalid Base64; `InvalidParameterError` for a decoded size that does not match the level.
+
+```python
+kem = MlKem()
+keypair = kem.generate_keypair()
+public_key = kem.load_public_key_b64(keypair.public_key_b64())
+assert public_key == keypair.public_key
+```
 
 ## Example
 
@@ -83,5 +101,6 @@ capsule, shared_secret = kem.encapsulate(keypair.public_key)
 
 # Decapsulate: recovers the same 32-byte shared secret
 recovered = kem.decapsulate(capsule, keypair.secret_key)
-assert shared_secret == recovered
+import hmac
+assert hmac.compare_digest(shared_secret, recovered)
 ```

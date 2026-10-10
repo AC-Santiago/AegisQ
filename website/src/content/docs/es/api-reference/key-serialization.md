@@ -7,7 +7,7 @@ sidebar:
     variant: tip
 ---
 
-El módulo `aegisq.keys` provee helpers de alto nivel para exportar/importar claves desde/hacia disco, variables de entorno y bytes en memoria, construidos sobre [`KeyPair`](/api-reference/keypair/).
+El módulo `aegisq.keys` provee helpers de alto nivel para exportar/importar claves desde/hacia disco, variables de entorno y bytes en memoria, construidos sobre [`KeyPair`](/es/api-reference/keypair/).
 
 El módulo es **v1.3.0** y vive en `aegisq/keys.py`. Cada función acepta tanto un string de ruta como un `pathlib.Path`.
 
@@ -23,8 +23,10 @@ El módulo es **v1.3.0** y vive en `aegisq/keys.py`. Cada función acepta tanto 
 | `public_key_to_json` | KeyPair → str | JSON | Ninguno |
 | `secret_key_to_pem` | KeyPair → str | PEM cifrado | AES-256-GCM (HKDF-SHA3-256) |
 
-:::caution[Las claves secretas siempre están cifradas]
-No hay API para guardar o exportar una clave secreta en texto plano. Las funciones `save_secret_key` / `load_secret_key` / `secret_key_to_pem` todas requieren un argumento `password: bytes` — perderlo significa perder la clave.
+:::caution[Los helpers cifran; las claves crudas siguen accesibles]
+`save_secret_key` y `secret_key_to_pem` cifran las exportaciones; `load_secret_key` devuelve `bytes` en texto plano. Todos requieren `password: bytes`, pero `KeyPair.secret_key` sigue disponible sin contraseña.
+
+HKDF-SHA3-256 no endurece contraseñas. Use bytes secretos de alta entropía, no una contraseña humana débil, y consérvelos de forma segura para recuperar la clave. Los ejemplos usan `secrets.token_bytes(32)`; la aplicación debe guardar ese secreto separado de la clave cifrada.
 :::
 
 ## Persistencia de Clave Pública
@@ -114,14 +116,16 @@ El archivo luce así:
 -----END ENCRYPTED ML-KEM PRIVATE KEY-----
 ```
 
-El cuerpo contiene un header magic/version, un nonce fresco de 12 bytes aleatorio, el ciphertext AES-GCM y un auth tag de 16 bytes. Se genera un nonce fresco por llamada vía `OsRng`, así que guardar el mismo keypair dos veces produce **salidas diferentes**.
+El blob contiene `magic || version || level_id || salt (16 B) || nonce (12 B) || ciphertext || tag (16 B)`. El bridge usa `getrandom::fill` para generar salt y nonce frescos y propaga los fallos del RNG; las exportaciones son aleatorias, no garantizadamente distintas.
 
 **Lanza:** `RngError` si el CSPRNG del OS no está disponible; `OSError` si no se puede escribir el archivo.
 
 ```python
 from aegisq.keys import save_secret_key
 
-save_secret_key(keypair, "private.key", password=b"s3cr3t p@ssw0rd")
+import secrets
+password = secrets.token_bytes(32)  # Conservar de forma segura para recuperarla
+save_secret_key(keypair, "private.key", password=password)
 ```
 
 ### `load_secret_key`
@@ -140,12 +144,12 @@ Lee un archivo PEM cifrado, verifica el auth tag y retorna la clave secreta como
 ```python
 from aegisq.keys import load_secret_key
 
-sk = load_secret_key("private.key", password=b"s3cr3t p@ssw0rd")
+sk = load_secret_key("private.key", password=password)
 plaintext = cipher.decrypt(encrypted_package, sk)
 ```
 
 :::note[Contraseña incorrecta vs. archivo manipulado]
-Ambos se manifiestan como `DecryptionError`. La verificación del auth tag de AES-GCM es binaria — la única señal que recibe la biblioteca es "válido" o "inválido". Una contraseña incorrecta y un archivo corrupto se ven idénticos para el llamador, por diseño.
+En un blob estructuralmente válido, una contraseña incorrecta o un ciphertext/tag autenticado manipulado produce `DecryptionError`. Un sobre o header malformado puede producir `KeySerializationError`; no todo archivo corrupto llega a la autenticación.
 :::
 
 ## Funciones de Conveniencia Solo-String
@@ -189,12 +193,14 @@ from aegisq.keys import (
 cipher = AegisCipher()
 keypair = cipher.generate_keypair()
 save_public_key(keypair, "alice.pub.pem", fmt="pem")
-save_secret_key(keypair, "alice.sec.pem", password=b"hunter2")
+import secrets
+password = secrets.token_bytes(32)  # Guardar por separado en un gestor de secretos
+save_secret_key(keypair, "alice.sec.pem", password=password)
 
 # Más tarde (o en otro proceso): cargar de vuelta
 cipher = AegisCipher(level=SecurityLevel.ML_KEM_768)
 pub = load_public_key("alice.pub.pem", level=SecurityLevel.ML_KEM_768)
-sec = load_secret_key("alice.sec.pem", password=b"hunter2")
+sec = load_secret_key("alice.sec.pem", password=password)
 
 # Usar normalmente
 package = cipher.encrypt(b"mensaje secreto", pub)
@@ -217,8 +223,8 @@ assert plaintext == b"mensaje secreto"
 ```json
 {
   "algorithm": "ML-KEM",
-  "level": "ML-KEM-768",
-  "public_key": "<Base64 STANDARD>"
+  "level": "ML_KEM_768",
+  "public_key": "<Base64 URL-safe sin padding>"
 }
 ```
 
@@ -226,14 +232,14 @@ assert plaintext == b"mensaje secreto"
 
 ```text
 -----BEGIN ENCRYPTED ML-KEM PRIVATE KEY-----
-<Base64 STANDARD de: magic || version || nonce || ciphertext || tag>
+<Base64 STANDARD de: magic || version || level_id || salt || nonce || ciphertext || tag>
 -----END ENCRYPTED ML-KEM PRIVATE KEY-----
 ```
 
-El formato del blob interno es un detalle de implementación — tratalo como opaco. El descifrado pasa solo por `load_secret_key_pem` / `load_secret_key_raw`.
+El formato interno del blob es un detalle de implementación; trátelo como opaco. El descifrado público desde archivos usa `aegisq.keys.load_secret_key(path, password=...)`; el usuario no debe importar el bridge nativo directamente.
 
 ## Ver También
 
-- [`KeyPair`](/api-reference/keypair/) — la clase subyacente con bytes crudos y métodos de serialización
-- [`MlKem`](/api-reference/mlkem/) — API KEM de bajo nivel con `load_public_key_b64`
-- [Excepciones](/api-reference/exceptions/#keyserializationerror) — `KeySerializationError`, `DecryptionError` lanzadas por estos helpers
+- [`KeyPair`](/es/api-reference/keypair/) — la clase subyacente con bytes crudos y métodos de serialización
+- [`MlKem`](/es/api-reference/mlkem/) — API KEM de bajo nivel con `load_public_key_b64`
+- [Excepciones](/es/api-reference/exceptions/#keyserializationerror) — `KeySerializationError`, `DecryptionError` lanzadas por estos helpers
