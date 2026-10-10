@@ -9,7 +9,18 @@ export default defineConfig({
 	site: 'https://aegisq-pqc.readthedocs.io',
 	integrations: [
 		starlight({
-			title: 'AegisQ Docs',
+			title: 'AegisQ',
+			disable404Route: true,
+			customCss: ['./src/styles/docs.css'],
+			components: {
+				Header: './src/components/DocsHeader.astro',
+				Hero: './src/components/LandingHero.astro',
+				SiteTitle: './src/components/DocsTitle.astro',
+				MobileMenuToggle: './src/components/AccessibleMenu.astro',
+			},
+			expressiveCode: {
+				styleOverrides: { borderRadius: '0.375rem' },
+			},
 			description:
 				'Post-Quantum Cryptography for Python — ML-KEM (FIPS 203) + AES-256-GCM',
 			// i18n: English is the root locale (URLs without /en/ prefix).
@@ -39,7 +50,13 @@ export default defineConfig({
 			],
 			sidebar: [
 				{
+					label: 'Overview',
+					translations: { es: 'Descripción general' },
+					slug: '',
+				},
+				{
 					label: 'Getting Started',
+					translations: { es: 'Primeros pasos' },
 					items: [
 						{ slug: 'getting-started/installation' },
 						{ slug: 'getting-started/quickstart' },
@@ -47,6 +64,7 @@ export default defineConfig({
 				},
 				{
 					label: 'API Reference',
+					translations: { es: 'Referencia de API' },
 					items: [
 						{ slug: 'api-reference/aegiscipher' },
 						{ slug: 'api-reference/keypair' },
@@ -62,6 +80,7 @@ export default defineConfig({
 				},
 				{
 					label: 'Internals',
+					translations: { es: 'Fundamentos internos' },
 					items: [
 						{ slug: 'internals/architecture' },
 						{ slug: 'internals/hybrid-kem-dem' },
@@ -71,6 +90,7 @@ export default defineConfig({
 				},
 				{
 					label: 'Reference',
+					translations: { es: 'Referencia' },
 					items: [
 						{ slug: 'reference/fips203-compliance' },
 						{ slug: 'reference/glossary' },

@@ -1,0 +1,60 @@
+---
+import DefaultHeader from '@astrojs/starlight/components/Header.astro';
+
+const { locale, id } = Astro.locals.starlightRoute;
+const isLanding = Astro.locals.starlightRoute.entry.data.template === 'splash';
+const isSpanish = locale === 'es';
+const prefix = `${import.meta.env.BASE_URL}${isSpanish ? 'es/' : ''}`;
+const section = (isSpanish ? id.replace(/^es\/?/, '') : id).split('/')[0];
+const chapters = [
+	{
+		section: 'getting-started',
+		label: isSpanish ? 'Primeros pasos' : 'Getting started',
+		path: 'getting-started/installation/',
+	},
+	{
+		section: 'api-reference',
+		label: isSpanish ? 'Referencia de API' : 'API reference',
+		path: 'api-reference/aegiscipher/',
+	},
+	{
+		section: 'internals',
+		label: isSpanish ? 'Fundamentos internos' : 'Internals',
+		path: 'internals/architecture/',
+	},
+	{
+		section: 'reference',
+		label: isSpanish ? 'Referencia' : 'Reference',
+		path: 'reference/glossary/',
+	},
+];
+---
+
+<div class="aq-masthead"><DefaultHeader /></div>
+{!isLanding && <nav class="aq-chapters" aria-label={isSpanish ? 'Secciones de documentación' : 'Documentation sections'}>
+	{
+		chapters.map((chapter) => (
+			<a href={`${prefix}${chapter.path}`} aria-current={section === chapter.section ? 'location' : undefined}>
+				{chapter.label}
+			</a>
+		))
+	}
+</nav>}
+
+<script>
+	import { initializeReadingMotion } from '../scripts/reading-motion';
+
+	// Astro's root fallback is /404.html; its Spanish route is /es/404/.
+	const normalizeErrorLanguageLinks = () => {
+		if (!document.querySelector('.aq-not-found')) return;
+		for (const option of document.querySelectorAll<HTMLOptionElement>('starlight-lang-select option')) {
+			option.value = /\/es\/404(?:\.html)?\/?$/.test(option.value)
+				? option.value.replace(/\/es\/404(?:\.html)?\/?$/, '/es/404/')
+				: option.value.replace(/\/404\/?$/, '/404.html');
+		}
+	};
+	normalizeErrorLanguageLinks();
+	initializeReadingMotion();
+	document.addEventListener('astro:page-load', normalizeErrorLanguageLinks);
+	document.addEventListener('astro:page-load', initializeReadingMotion);
+</script>

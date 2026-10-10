@@ -1,0 +1,20 @@
+---
+import DefaultMobileMenuToggle from '@astrojs/starlight/components/MobileMenuToggle.astro';
+---
+
+<DefaultMobileMenuToggle />
+
+<script>
+	// Starlight stores expanded state on the custom element; expose it on the button too.
+	const menu = document.querySelector('starlight-menu-button');
+	if (menu) {
+		const syncExpanded = () => {
+			menu.querySelector('button')?.setAttribute('aria-expanded', menu.getAttribute('aria-expanded') ?? 'false');
+		};
+		syncExpanded();
+		new MutationObserver(syncExpanded).observe(menu, {
+			attributes: true,
+			attributeFilter: ['aria-expanded'],
+		});
+	}
+</script>
