@@ -1,11 +1,15 @@
 ---
 title: FIPS 203 Compliance
-description: AegisQ implementation roadmap, standards compliance, and Rust dependency inventory through v1.5.0.
+description: AegisQ implementation history, standards references, dependency requirements, and test-vector scope.
 ---
 
 ## Implementation Roadmap
 
-AegisQ was developed in phases. Each phase had to pass all tests before advancing to the next. The current stable release is **v1.5.0**; `develop` is currently tracking **v1.6.0-rc1** (the next prerelease).
+AegisQ was developed in phases. The tables below describe implemented components and historical releases, not certification or a current test-run result. Published versions are listed on [PyPI](https://pypi.org/project/aegisq-pqc/); checkout versions live in the package manifests, and release history is recorded in `CHANGELOG.md`.
+
+:::caution[Implementation is not certification]
+FIPS 203 specifies ML-KEM. Implementing it and running known-answer tests does not constitute official ACVP validation, FIPS 140 module certification, or an independent audit of AegisQ. The streaming frame format and ML-KEM PEM-like envelopes are AegisQ formats, not standardized by the references below.
+:::
 
 ### v1.0–v1.2 — Core FIPS 203 ML-KEM + Hybrid KEM-DEM
 
@@ -39,7 +43,7 @@ AegisQ was developed in phases. Each phase had to pass all tests before advancin
 | 26 | GitHub Actions CI/CD | — | ✅ |
 | 27 | NIST ACVP KAT vector JSON files | NIST vectors | ✅ |
 | 27b | KAT vector verification tests | NIST vectors | ✅ |
-| 28 | EphemeralSession (forward secrecy) | — | ✅ |
+| 28 | EphemeralSession (session keypair lifecycle) | — | ✅ |
 | 29 | Async support (`encrypt_async`, `decrypt_async`) | — | ✅ |
 
 ### v1.3.0 — KDF, Key Wrap, and Key Serialization
@@ -59,7 +63,7 @@ AegisQ was developed in phases. Each phase had to pass all tests before advancin
 
 | Phase | Component | Reference | Status |
 |-------|-----------|-----------|--------|
-| 33a | Streaming encrypt/decrypt (`stream.rs`, `stream_bindings.rs`, `encrypt_stream` / `decrypt_stream`) | NIST SP 800-38D §5.2 (frame-based AEAD) | ✅ |
+| 33a | Streaming encrypt/decrypt (`stream.rs`, `stream_bindings.rs`, `encrypt_stream` / `decrypt_stream`) | AES-GCM primitive: SP 800-38D; framing: AegisQ-specific | ✅ |
 | 33b | Criterion benchmarks for NTT and KEM (`benches/ntt.rs`, `benches/kem.rs`) | — | ✅ |
 
 ## Standards Compliance
@@ -75,12 +79,12 @@ AegisQ was developed in phases. Each phase had to pass all tests before advancin
 
 ## Rust Dependencies
 
-Versions reflect the **v1.5.0** release. Workspace-wide declarations live in `Cargo.toml`.
+Versions are current manifest requirements, not exact lockfile resolutions or a historical v1.5.0 inventory. Workspace declarations live in `Cargo.toml`; PyO3 and Criterion are declared in the bridge/core manifests. `Cargo.lock` records resolved versions.
 
 | Crate | Version | Purpose | `no_std` |
 |-------|---------|---------|----------|
 | `aes-gcm` | 0.11 | AES-256-GCM authenticated encryption (hardware AES-NI) | ✅ |
-| `sha3` | 0.12 | SHA3-256/512 and SHAKE-128/256 for ML-KEM | ✅ |
+| `sha3` | 0.12 | SHA3-256/512 for ML-KEM | ✅ |
 | `shake` | 0.1 | XOF variants moved out of `sha3` upstream (RustCrypto/XOFs split) | ✅ |
 | `zeroize` | 1.9 | Secure memory erasure of secrets | ✅ |
 | `subtle` | 2.6 | Constant-time comparisons | ✅ |
@@ -99,4 +103,6 @@ AegisQ verifies its ML-KEM implementation against the official NIST ACVP (Automa
 - **KeyGen** — `tests/python/json-files/ML-KEM-keyGen-FIPS203/`
 - **Encap/Decap** — `tests/python/json-files/ML-KEM-encapDecap-FIPS203/`
 
-The test runner `tests/python/test_kat_vectors.py` parses each JSON vector and asserts bit-exact equality between the implementation output and the expected bytes. This is the strongest possible correctness signal — running AegisQ against the same vectors NIST uses to certify reference implementations.
+`tests/python/test_kat_vectors.py` explicitly compares expected KeyGen and encapsulation outputs byte-for-byte. It does not invoke decapsulation or assert the expected decapsulation/rejection outputs from the combined corpus. Roundtrips are checked separately in `tests/python/test_kem_api.py`; `tests/python/test_implicit_rejection.py` covers invalid capsule contents. Those tests do not replace decapsulation known-answer tests.
+
+Passing these tests is correctness evidence for the checked inputs, not a proof of security, exhaustive vector coverage, or official certification. A pass claim must refer to an actual run against the matching source and native extension.

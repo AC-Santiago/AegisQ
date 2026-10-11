@@ -1,76 +1,47 @@
 ---
-title: Welcome to AegisQ
+title: AegisQ for Python
 description: Post-Quantum Cryptography for Python — ML-KEM (FIPS 203) + AES-256-GCM
+tableOfContents: false
 template: splash
-hero:
-  title: AegisQ
-  tagline: Post-Quantum Cryptography for Python — ML-KEM (FIPS 203) + AES-256-GCM
-  actions:
-    - text: Get Started
-      link: /getting-started/installation/
-      icon: right-arrow
-      variant: primary
-    - text: View on PyPI
-      link: https://pypi.org/project/aegisq-pqc/
-      icon: external
-      variant: secondary
+hero: {}
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+:::caution[Beta software]
+Implementing standardized algorithms and testing against NIST vectors does not certify AegisQ or establish an independent security audit. Review the [security model](/internals/security-model/) before choosing it for sensitive systems.
+:::
 
-## Why AegisQ?
+## Find Your Workflow
 
-AegisQ is a hybrid cryptographic library that combines **ML-KEM** (FIPS 203) for quantum-resistant key encapsulation with **AES-256-GCM** for authenticated symmetric encryption. The cryptographic core is written in Rust for performance and security guarantees, exposed to Python via PyO3.
+### Encrypt data
 
-<CardGrid>
-  <Card title="Quantum-Safe" icon="shield">
-    ML-KEM (FIPS 203), resistant to Shor's algorithm. Your data stays secure even against future quantum computers.
-  </Card>
-  <Card title="Constant-Time" icon="approve-check-circle">
-    `subtle::ConstantTimeEq` with no secret-dependent branches. Immune to timing side-channel attacks.
-  </Card>
-  <Card title="Memory Zeroization" icon="warning">
-    `zeroize::Zeroize` on all structures containing secrets. Keys are securely erased after use.
-  </Card>
-  <Card title="Rust Core, Python API" icon="rocket">
-    Rust performance with Python ergonomics. Encrypt data securely in just 3 lines of code.
-  </Card>
-  <Card title="GIL Release" icon="forward-slash">
-    `py.detach()` for true parallelism during crypto operations. No GIL bottleneck.
-  </Card>
-  <Card title="Type-Safe" icon="document">
-    PEP 561 type stubs with full IDE autocompletion support. Catch errors before runtime.
-  </Card>
-</CardGrid>
+Start with [AegisCipher](/api-reference/aegiscipher/) and [KeyPair](/api-reference/keypair/).
+Choose a [security level](/api-reference/security-levels/) and inspect the
+[exception hierarchy](/api-reference/exceptions/). [MlKem](/api-reference/mlkem/)
+exposes raw KEM operations for advanced protocols.
 
-## Beyond the Basics
+### Work with files and asyncio
 
-AegisQ ships production-ready extensions on top of the one-shot hybrid flow:
+[Streaming](/api-reference/streaming/) processes data in chunks; memory use
+depends on input chunking. [Async methods](/api-reference/async-methods/) offload
+encryption and decryption to a thread pool; key generation stays synchronous.
+[Key serialization](/api-reference/key-serialization/) covers PEM, JSON, and
+encrypted persistence with high-entropy wrapping secrets.
 
-<CardGrid>
-  <Card title="Streaming Encryption" icon="stream">
-    Encrypt gigabyte-scale files with bounded memory via `encrypt_stream` / `decrypt_stream` generators. v1.5.0.
-  </Card>
-  <Card title="Async API" icon="rocket">
-    `encrypt_async` / `decrypt_async` offload to a thread pool without blocking the event loop. v1.4.0.
-  </Card>
-  <Card title="Key Serialization" icon="document">
-    PEM, JSON, and encrypted-PEM persistence with HKDF-SHA3-256 password protection. v1.3.0.
-  </Card>
-  <Card title="Forward Secrecy" icon="seti:forward">
-    `EphemeralSession` auto-destroys each ephemeral keypair on close — past sessions stay safe.
-  </Card>
-  <Card title="Context Manager" icon="seti:config">
-    `with AegisCipher()` proactively zeroes any registered Python-side buffer on exit. v1.4.0.
-  </Card>
-  <Card title="NIST KAT Verified" icon="approve-check-circle">
-    Implementation validated against NIST ACVP test vectors — bit-exact match with the reference implementation.
-  </Card>
-</CardGrid>
+### Understand key lifetimes and security
 
-## Get Started
+[Ephemeral sessions](/api-reference/ephemeral-session/) and the
+[context manager](/api-reference/context-manager/) provide lifecycle helpers,
+not complete erasure or forward-secrecy guarantees. Selected Rust buffers are
+zeroized; caller-owned Python bytes and all key copies are not covered.
 
-- [Installation](/getting-started/installation/) — install from PyPI or build from source.
-- [Quick Start](/getting-started/quickstart/) — encrypt your first payload in 3 lines.
-- [API Reference](/api-reference/aegiscipher/) — full class and method documentation.
-- [Architecture](/internals/architecture/) — how the Rust core, FFI bridge, and Python API fit together.
+Read the [architecture](/internals/architecture/),
+[hybrid KEM-DEM flow](/internals/hybrid-kem-dem/), and
+[mathematical foundation](/internals/mathematical-foundation/) for implementation
+details. Native operations release the GIL with `py.detach()`. The PEP 561 marker
+and native stubs support tooling, but streaming bindings are not yet included
+in the stub.
+
+NIST vector tests cover KeyGen and encapsulation outputs; this is not official
+ACVP validation. The [FIPS 203 reference](/reference/fips203-compliance/) and
+[glossary](/reference/glossary/) explain the standard and terminology. Timing
+defenses are not a complete side-channel audit.

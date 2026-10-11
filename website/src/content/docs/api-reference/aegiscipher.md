@@ -5,11 +5,37 @@ description: High-level hybrid encryption API — ML-KEM key encapsulation + AES
 
 `AegisCipher` is the **recommended API** for most users. It handles the entire hybrid KEM-DEM flow — ML-KEM key encapsulation followed by AES-256-GCM encryption — behind a simple, ergonomic interface.
 
-The class also provides four extensions that cover most production scenarios:
+**Default: `SecurityLevel.ML_KEM_768`.** Use the same parameter set for encryption and decryption.
 
-- **[Context manager](#context-manager)** (`__enter__` / `__exit__`) — proactive zeroization for forward-compatible session APIs (v1.4.0).
-- **[Streaming encryption](#streaming-encryption)** (`encrypt_stream` / `decrypt_stream`) — encrypt files of any size with bounded memory (v1.5.0).
-- **[Async methods](#async-methods)** (`encrypt_async` / `decrypt_async`) — non-blocking variants for asyncio code paths (v1.4.0).
+## Encrypt and Decrypt
+
+Install the package with Python 3.11 or later:
+
+```bash
+python -m pip install aegisq-pqc
+```
+
+```python
+from aegisq import AegisCipher
+
+cipher = AegisCipher()  # ML-KEM-768 by default
+keypair = cipher.generate_keypair()
+
+package = cipher.encrypt(b"Hello, AegisQ", keypair.public_key)
+plaintext = cipher.decrypt(package, keypair.secret_key)
+assert plaintext == b"Hello, AegisQ"
+```
+
+Obtain public keys through a trusted channel. AES-GCM authenticates the payload,
+not the sender's identity. AegisQ is beta software; standardized algorithms do
+not establish product certification or an independent security audit. Review
+the [security model](/internals/security-model/) before sensitive use.
+
+The class also provides three additional interfaces:
+
+- **[Context manager](#context-manager)** (`__enter__` / `__exit__`) — cleanup of privately registered mutable buffers (v1.4.0), not caller-owned keys.
+- **[Streaming encryption](#streaming-encryption)** (`encrypt_stream` / `decrypt_stream`) — process large files in bounded chunks (v1.5.0).
+- **[Async methods](#async-methods)** (`encrypt_async` / `decrypt_async`) — thread-pool wrappers for asyncio code paths.
 
 ## Class Signature
 
@@ -34,7 +60,7 @@ class AegisCipher:
         ciphertext_chunks: Iterable[bytes],
     ) -> Iterator[bytes]
 
-    # Async (v1.4.0)
+    # Async
     async def encrypt_async(self, plaintext: bytes, recipient_public_key: bytes) -> bytes
     async def decrypt_async(self, encrypted_package: bytes, secret_key: bytes) -> bytes
 
@@ -70,7 +96,7 @@ Generates a new ML-KEM keypair for the configured security level.
 ```python
 keypair = cipher.generate_keypair()
 # keypair.public_key  → share openly
-# keypair.secret_key  → keep private, zeroized on deletion
+# keypair.secret_key  → keep private; immutable bytes are not securely erased on deletion
 # keypair.level       → the SecurityLevel used
 ```
 
@@ -113,19 +139,19 @@ The `KeyPair` object returned by `generate_keypair()`. For full documentation se
 ```python
 class KeyPair:
     public_key: bytes   # Encryption key (share openly)
-    secret_key: bytes   # Decapsulation key (keep private, zeroized on drop)
+    secret_key: bytes   # Decapsulation key (keep private; no complete erasure guarantee)
     level: SecurityLevel
 ```
 
 ### `__repr__` (v1.4.0 — safe fingerprint)
 
-The repr intentionally **does not leak** raw bytes or key sizes. It returns:
+The repr omits raw key bytes and explicit lengths. The level still identifies the parameter sizes. Example for ML-KEM-768:
 
 ```text
-KeyPair(level=<SecurityLevel.ML_KEM_768>, fp=<16-hex>)
+KeyPair(level=MlKem768, fp=<16-hex>)
 ```
 
-`<16-hex>` is the first 8 bytes of `SHA3-256(public_key)` — a stable, non-reversible fingerprint.
+`<16-hex>` is the first 8 bytes of `SHA3-256(public_key)`: a stable, truncated public identifier, not identity authentication. It can correlate key use across logs.
 
 ### Serialization methods (v1.3.0)
 
@@ -173,9 +199,7 @@ Full documentation: [Streaming Encryption](/api-reference/streaming/).
 
 ## Async Methods
 
-:::note[v1.4.0]
-`encrypt_async` and `decrypt_async` were introduced in v1.4.0.
-:::
+`encrypt_async` and `decrypt_async` offload their synchronous equivalents. `generate_keypair()` remains synchronous and can block an event loop if called directly inside a coroutine.
 
 Non-blocking variants of `encrypt()` / `decrypt()` for asyncio code. They run the synchronous implementation in the default `ThreadPoolExecutor`, so the event loop stays responsive even on large payloads.
 
@@ -185,7 +209,7 @@ from aegisq import AegisCipher
 
 async def main():
     cipher = AegisCipher()
-    keypair = cipher.generate_keypair()
+    keypair = await asyncio.to_thread(cipher.generate_keypair)
 
     package = await cipher.encrypt_async(b"secret", keypair.public_key)
     plaintext = await cipher.decrypt_async(package, keypair.secret_key)
@@ -202,7 +226,7 @@ Full documentation: [Async Methods](/api-reference/async-methods/).
 The `__enter__` / `__exit__` protocol was introduced in v1.4.0.
 :::
 
-`AegisCipher` can be used inside a `with` block. On exit, any Python-side buffer registered during the session is **overwritten with zeros in place**. Today's public API does not retain Python-side material, so this is a forward-compatible hook — but it costs nothing to use.
+`AegisCipher` can be used inside a `with` block. On exit, mutable buffers registered with its private hook are overwritten. The current public methods do not register buffers there. This does not erase caller-owned keys/plaintext or close a suspended stream; it does not disable further cipher calls.
 
 ```python
 from aegisq import AegisCipher
@@ -217,12 +241,12 @@ with AegisCipher() as cipher:
 
 ```python
 >>> repr(cipher)
-'AegisCipher(level=<SecurityLevel.ML_KEM_768>, inactive)'
+'AegisCipher(level=SecurityLevel.ML_KEM_768, inactive)'
 
 >>> with cipher:
 ...     repr(cipher)
 ...
-'AegisCipher(level=<SecurityLevel.ML_KEM_768>, active)'
+'AegisCipher(level=SecurityLevel.ML_KEM_768, active)'
 ```
 
 Full documentation: [Context Manager](/api-reference/context-manager/).
@@ -236,7 +260,7 @@ from aegisq import AegisCipher, SecurityLevel
 cipher_bob = AegisCipher(level=SecurityLevel.ML_KEM_768)
 keypair = cipher_bob.generate_keypair()
 public_key: bytes = keypair.public_key   # 1184 bytes — share with anyone
-secret_key: bytes = keypair.secret_key   # 2400 bytes — NEVER share, zeroized on del
+secret_key: bytes = keypair.secret_key   # 2400 bytes — NEVER share or log
 
 # 2. Alice (sender) encrypts using Bob's public key
 cipher_alice = AegisCipher(level=SecurityLevel.ML_KEM_768)

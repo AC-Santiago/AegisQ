@@ -24,9 +24,9 @@ Una vez que ML-KEM genera el shared secret `K` de 32 bytes, AegisQ lo alimenta d
 ## Manejo del Nonce — Regla Crítica
 
 :::caution[Unicidad del Nonce]
-Un nonce **NUNCA** debe reutilizarse con la misma clave. En AegisQ, esto se garantiza generando un nonce fresco de 96 bits criptográficamente aleatorio para cada llamada a `encrypt()` usando `OsRng.fill_bytes()`. No hay contador, no hay estado, no hay nonce secuencial.
+Un nonce **NUNCA** debe reutilizarse con la misma clave. `encrypt()` one-shot genera un nonce aleatorio fresco de 96 bits mediante el wrapper local `OsRng`, respaldado por `getrandom::fill`. Los fallos del RNG se propagan. El muestreo aleatorio reduce el riesgo de colisión, pero no garantiza unicidad.
 
-Esto es seguro porque la probabilidad de colisión de un nonce de 96 bits bajo 2³² cifrados con la misma clave es negligible (~10⁻¹⁹).
+Para `n` nonces aleatorios independientes **bajo la misma clave**, la aproximación de cumpleaños es `n(n−1) / 2^97`; con `n = 2^32` resulta aproximadamente `1.16 × 10⁻¹⁰`. Cada llamada one-shot realiza una nueva encapsulación ML-KEM; este cálculo no afirma que las llamadas reutilicen una clave AES. Streaming usa otro esquema de nonces indexados; consulte [Cifrado en Streaming](/es/api-reference/streaming/).
 :::
 
 ## Ensamblado del Transit Package
@@ -48,7 +48,7 @@ Donde el tamaño de `ML-KEM Capsule` depende del nivel de seguridad:
 
 ### Flujo de Cifrado
 
-1. Llamar `mlkem::encaps(public_key)` → `(capsule, shared_secret_32B)`
+1. Llamar `kem::encapsulate(public_key, level)` → resultado con capsule y shared secret
 2. Generar nonce aleatorio de 12 bytes vía `OsRng`
 3. Llamar `aes_gcm::encrypt(key=shared_secret, nonce, plaintext)` → `(tag, ciphertext)`
 4. **Zeroizar `shared_secret` inmediatamente**
@@ -57,7 +57,7 @@ Donde el tamaño de `ML-KEM Capsule` depende del nivel de seguridad:
 ### Flujo de Descifrado
 
 1. Dividir el Transit Package por offsets conocidos (capsule_size, luego 12, 16, resto)
-2. Llamar `mlkem::decaps(secret_key, capsule)` → `shared_secret_32B`
+2. Llamar `kem::decapsulate(capsule, secret_key, level)` → `shared_secret_32B`
 3. Llamar `aes_gcm::decrypt(key=shared_secret, nonce, tag, ciphertext)` → `plaintext` o `Err`
 4. **Zeroizar `shared_secret` inmediatamente**
 5. Si la verificación del tag falla → retornar `Err(AegisQError::DecryptionFailed)`
@@ -66,10 +66,11 @@ Donde el tamaño de `ML-KEM Capsule` depende del nivel de seguridad:
 
 | Escenario | ML-KEM Decaps | AES-GCM Decrypt |
 |-----------|---------------|-----------------|
-| Capsule inválida (bytes incorrectos) | Silencioso: retorna K pseudoaleatoria | N/A |
+| Contenido inválido, tamaño de capsule correcto | Retorna K pseudoaleatoria | Se espera que falle la verificación del tag |
+| Tamaño incorrecto de clave/capsule o paquete demasiado corto | Error estructural (`InvalidParameterError`) | No se alcanza |
 | Capsule correcta, clave AES incorrecta | N/A (la clave se deriva de la capsule) | Error: `DecryptionError` |
 | Auth tag no coincide (payload manipulado) | N/A | Error: `DecryptionError` |
-| Todo correcto | Retorna plaintext | Retorna plaintext |
+| Todo correcto | Retorna shared secret | Retorna plaintext |
 
 :::note
 A diferencia del rechazo silencioso de ML-KEM, una falla en el auth tag de AES-GCM **siempre** lanza `DecryptionError`. Este es el comportamiento correcto — le dice al llamador que el payload fue manipulado o que se usó la clave incorrecta, sin revelar nada sobre el paso de desencapsulación ML-KEM.
@@ -78,7 +79,7 @@ A diferencia del rechazo silencioso de ML-KEM, una falla en el auth tag de AES-G
 ## API Interna de Rust
 
 ```rust
-use aegisq_core::{hybrid, SecurityLevel};
+use aegisq_core::{hybrid, kem::SecurityLevel};
 
 // Hybrid encrypt: ML-KEM encaps + AES-256-GCM
 let encrypted_package: Vec<u8> = hybrid::encrypt(
@@ -89,12 +90,12 @@ let encrypted_package: Vec<u8> = hybrid::encrypt(
 
 // Hybrid decrypt: ML-KEM decaps + AES-256-GCM verify + decrypt
 let plaintext: Vec<u8> = hybrid::decrypt(
-    secret_key,
     &encrypted_package,
+    secret_key,
     SecurityLevel::MlKem768,
 )?;
 ```
 
 :::note[OsRng]
-AegisQ usa `rand_core::OsRng` internamente dentro de `hybrid::encrypt` para generar nonces aleatorios frescos. El llamador no necesita pasar un RNG — esto asegura que el manejo del nonce se hace correctamente y previene la reutilización accidental. `OsRng` obtiene entropía de `/dev/urandom` en Linux, `BCryptGenRandom` en Windows y `getentropy` en macOS — todos CSPRNGs a nivel del SO.
+`OsRng` es un wrapper local de `getrandom::fill`, no `rand_core::OsRng`. El llamador no pasa un RNG. `getrandom` selecciona el backend de la plataforma; sus fallos se convierten en `AegisQError::RngError`. La limpieza tras AES-GCM no implica el borrado completo de buffers ni de rutas de error temprano; consulte el [modelo de seguridad](/es/internals/security-model/).
 :::

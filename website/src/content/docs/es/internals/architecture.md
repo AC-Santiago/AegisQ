@@ -8,11 +8,11 @@ AegisQ enforce separación estricta entre tres capas arquitectónicas. **Violar 
 ## El Modelo de Tres Capas
 
 ```text
-╔═══════════════════════════════════════════════════════════════�
+╔═══════════════════════════════════════════════════════════════╗
 ║  CAPA 3: API Python (aegisq/)                                 ║
 ║  ┌─────────────────────────────────────────────────────────┐  ║
 ║  │  AegisCipher — encrypt / decrypt / stream / async / ctx │  ║
-║  │  EphemeralSession — claves efímeras con forward secrecy │  ║
+║  │  EphemeralSession — ciclo de vida del keypair de sesión │  ║
 ║  │  MlKem — KEM crudo para usuarios avanzados             │  ║
 ║  │  aegisq.keys — persistencia en archivos PEM/JSON/cifrado│  ║
 ║  │  Jerarquía de excepciones + stubs de tipo PEP 561       │  ║
@@ -21,7 +21,7 @@ AegisQ enforce separación estricta entre tres capas arquitectónicas. **Violar 
 ║  CAPA 2: Bridge FFI (crates/aegisq-pyo3/)                     ║
 ║  ┌─────────────────────────────────────────────────────────┐  ║
 ║  │  Bindings de PyO3 (#[pyfunction], #[pyclass])           │  ║
-║  │  Pase de datos zero-copy (&[u8] → Python bytes)         │  ║
+║  │  Entradas prestadas; salidas Python bytes copiadas      │  ║
 ║  │  Liberación del GIL (py.detach) para operaciones crypto │  ║
 ║  │  SIN lógica criptográfica — capa pura de traducción     │  ║
 ║  └─────────────────────────────────────────────────────────┘  ║
@@ -32,7 +32,7 @@ AegisQ enforce separación estricta entre tres capas arquitectónicas. **Violar 
 ║  │  AES-256-GCM cifrado autenticado                        │  ║
 ║  │  HKDF-SHA3-256 + wrap cifrado de clave secreta          │  ║
 ║  │  Transit Package (formatos one-shot + streaming)        │  ║
-║  │  Compatible con #![no_std] — tiempo constante — zeroize │  ║
+║  │  #![no_std] + alloc — subtle — zeroización acotada      │  ║
 ║  │  SIN conocimiento de Python ni de FFI                   │  ║
 ║  └─────────────────────────────────────────────────────────┘  ║
 ╚═══════════════════════════════════════════════════════════════╝
@@ -58,10 +58,10 @@ Implementa toda la matemática criptográfica en Rust puro con compatibilidad `n
 Traduce tipos de Rust a tipos de Python vía PyO3 y libera el GIL durante operaciones costosas.
 
 - Bindings `#[pyfunction]` y `#[pyclass]`
-- Pase de datos zero-copy (`&[u8]` ↔ Python `bytes`)
+- Entradas prestadas como `&[u8]`; `PyBytes::new` copia las salidas nativas y los resultados de los getters de claves
 - Liberación del GIL vía `py.detach()` para operaciones criptográficas
-- Clases PyO3 `StreamEncryptor` / `StreamDecryptor` con binding estilo `__call__`
-- Tipos PyO3 (`KeyPair`, `SecurityLevel`) con `__repr__` seguro que expone solo un fingerprint SHA3-256
+- Clases nativas de streaming con métodos explícitos (`encrypt_chunk`, `finalize`, `decrypt_chunk`, `process_eof`) usadas por los generadores Python
+- Tipos PyO3 `KeyPair` y `SecurityLevel`; el repr del keypair contiene nivel y fingerprint público truncado, no bytes secretos
 - **Sin lógica criptográfica** — capa pura de traducción
 
 ### Capa 3: API Python (`aegisq/`)
@@ -69,7 +69,7 @@ Traduce tipos de Rust a tipos de Python vía PyO3 y libera el GIL durante operac
 Provee las clases Python ergonómicas con las que interactúan los usuarios finales.
 
 - `AegisCipher` — API de alto nivel de encrypt/decrypt/streaming/async/context-manager
-- `EphemeralSession` — Forward secrecy vía keypairs efímeros auto-gestionados
+- `EphemeralSession` — Keypair de sesión auto-gestionado; el cierre descarta su referencia sin garantizar un borrado seguro completo
 - `MlKem` — Operaciones KEM crudas para usuarios avanzados
 - `aegisq.keys` — Persistencia de claves basada en archivos (PEM, JSON, PEM cifrado)
 - `SecurityLevel` — Enum para conjuntos de parámetros ML-KEM
@@ -130,7 +130,7 @@ aegisq/
 │   ├── cipher.py                   # AegisCipher — API principal de alto nivel
 │   ├── kem.py                      # MlKem — operaciones KEM crudas
 │   ├── keys.py                     # Persistencia de claves basada en archivos (v1.3.0)
-│   ├── session.py                  # EphemeralSession — forward secrecy
+│   ├── session.py                  # EphemeralSession — ciclo de vida
 │   ├── exceptions.py               # Jerarquía AegisQError (+ SessionExpiredError)
 │   └── py.typed                    # Marcador PEP 561
 │
@@ -170,7 +170,7 @@ aegisq/
 
 ## ¿Por qué Tres Capas?
 
-- **Testeabilidad** — Cada capa se puede testear en aislamiento. El núcleo en Rust tiene ~50 tests unitarios en módulos `#[cfg(test)]` que no tocan Python. El bridge PyO3 tiene sus propios tests de integración. La API Python tiene tests end-to-end con pytest.
+- **Testeabilidad** — Cada capa se puede probar en aislamiento. Los tests Rust viven en módulos `#[cfg(test)]` sin Python. El bridge y la API Python tienen tests de integración y end-to-end en `tests/python/`.
 - **Auditabilidad** — La revisión criptográfica se enfoca en la Capa 1. La revisión de correctitud del FFI se enfoca en la Capa 2. La revisión de ergonomía se enfoca en la Capa 3.
 - **Portabilidad** — La Capa 1 es `no_std` + `alloc`. Un futuro binding de Node.js / Go / WASM es una reescritura de la Capa 2, no de la Capa 1.
-- **Performance** — El pase de bytes zero-copy (`&[u8]` ↔ Python `bytes`) y la liberación del GIL (`py.detach()`) mantienen la ergonomía de Python sin sacrificar el rendimiento multi-core.
+- **Performance** — Las entradas prestadas evitan copias innecesarias y `py.detach()` permite ejecutar otros threads Python durante trabajo nativo costoso. Las salidas siguen requiriendo asignaciones Python; la arquitectura no constituye un benchmark ni garantiza escalabilidad multi-core.

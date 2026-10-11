@@ -7,11 +7,11 @@ sidebar:
     variant: tip
 ---
 
-[`AegisCipher`](/api-reference/aegiscipher/) provee `encrypt_stream()` y `decrypt_stream()` para **payloads grandes** — archivos, streams de red, backups — que no caben en memoria. La API está **basada en generadores**: pasás un iterable de chunks de plaintext y obtenés un iterable de chunks de ciphertext. El llamador controla el chunking de I/O.
+[`AegisCipher`](/es/api-reference/aegiscipher/) proporciona `encrypt_stream()` y `decrypt_stream()` para **payloads grandes** — archivos, streams de red, backups — que no caben en memoria. La API está **basada en generadores**: recibe un iterable de chunks de plaintext y devuelve un iterable de chunks de ciphertext. El llamador controla el chunking de I/O.
 
 ## ¿Por qué Streaming?
 
-`encrypt()` / `decrypt()` cargan el plaintext entero en memoria de una vez. Para un archivo de video de 4 GiB, eso son 4 GiB de bytes Python residentes más buffers intermedios de AES-GCM. La API de streaming mantiene la memoria acotada a **un chunk a la vez**, sin importar el tamaño total del payload.
+La API one-shot procesa buffers completos. Streaming procesa bloques de plaintext acotados, pero el descifrado también acumula y copia fragmentos de ciphertext. La memoria depende de los tamaños y buffers del llamador; pasar varios gigabytes como un único bloque elimina el beneficio.
 
 ## API
 
@@ -32,9 +32,9 @@ Cifra un iterable de chunks de plaintext y produce chunks de ciphertext.
 |-----------|------|---------|-------------|
 | `recipient_public_key` | `bytes` | — | Clave pública ML-KEM del receptor. |
 | `plaintext_chunks` | `Iterable[bytes]` | — | Cualquier iterable que produzca chunks de plaintext (típicamente un iterador de archivo). |
-| `chunk_size` | `int` | `65536` (64 KiB) | Tamaño máximo de ciphertext por chunk producido. Rango: `1..=16 MiB`. |
+| `chunk_size` | `int` | `65536` (64 KiB) | Payload máximo de plaintext/ciphertext por frame, sin sus 4 bytes de longitud ni tag de 16 bytes. Rango: `1..=16 MiB`. |
 
-**Produce:** chunks de `bytes` que forman un Transit Package completo en modo stream.
+**Produce:** header, frames de datos y EOF como `bytes`. Agote el generador para emitir EOF. No produzca bloques de plaintext vacíos: un frame de longitud cero se interpreta como EOF. Un iterable vacío representa un payload vacío.
 
 **Lanza:** `InvalidParameterError` si un chunk de plaintext excede `chunk_size` o si `chunk_size` está fuera de rango; `RngError` si el CSPRNG del OS no está disponible.
 
@@ -55,7 +55,11 @@ Descifra un iterable de chunks de ciphertext y produce chunks de plaintext.
 | `secret_key` | `bytes` | — | Clave secreta ML-KEM del receptor. |
 | `ciphertext_chunks` | `Iterable[bytes]` | — | Cualquier iterable que produzca chunks de ciphertext (típicamente un iterador de archivo). |
 
-**Produce:** chunks de `bytes` de plaintext.
+**Produce:** bloques de plaintext autenticados individualmente, antes de verificar el EOF del stream. Agote el iterador antes de considerar completo el payload.
+
+:::caution[Finalización y framing]
+Detenerse antes puede ocultar errores posteriores de autenticación o truncado. Guarde la salida provisionalmente y publíquela solo tras completar la iteración sin errores. El decoder actual se detiene en el primer EOF autenticado; no rechaza bytes posteriores ni concatena paquetes. Controle los límites de mensaje por separado.
+:::
 
 **Lanza:** `DecryptionError` si un tag de AES-GCM no verifica, si el marcador EOF falta o es inválido, o si el header del stream está truncado; `InvalidParameterError` si el header está malformado o la clave secreta tiene tamaño incorrecto.
 
@@ -97,7 +101,7 @@ Cada chunk `i` (indexado desde 0) recibe un nonce de 12 bytes derivado del `base
 nonce_i = i.to_be_bytes() || base_nonce[4..12]
 ```
 
-- `i.to_be_bytes()` son 4 bytes (uint32 big-endian) — soporta hasta 2³² chunks por stream
+- `i.to_be_bytes()` son 4 bytes uint32 big-endian; EOF también consume un índice. No lo interprete como un stream ilimitado ni agote el contador
 - `base_nonce[4..12]` son 8 bytes del base nonce aleatorio generado al construir el header
 
 ### AAD (Additional Authenticated Data)
@@ -135,10 +139,14 @@ with open("video.mp4", "rb") as src, open("video.aegisq", "wb") as out:
         out.write(ct_chunk)
 
 # Descifrar: archivo cifrado → archivo recuperado
-with open("video.aegisq", "rb") as src, open("video.recovered.mp4", "wb") as out:
+with open("video.aegisq", "rb") as src, open("video.recovered.partial", "wb") as out:
     chunk_iter = iter(lambda: src.read(CHUNK), b"")
     for pt_chunk in cipher.decrypt_stream(keypair.secret_key, chunk_iter):
         out.write(pt_chunk)
+
+# Solo tras verificar EOF al completar la iteración. Si falla, no publicar el archivo parcial.
+from pathlib import Path
+Path("video.recovered.partial").replace("video.recovered.mp4")
 ```
 
 ## Límites y Casos Edge
@@ -146,7 +154,7 @@ with open("video.aegisq", "rb") as src, open("video.recovered.mp4", "wb") as out
 | Límite | Valor | Notas |
 |--------|-------|-------|
 | Rango de `chunk_size` | `1..=16 MiB` | Fuera de rango lanza `InvalidParameterError` |
-| Máximo de chunks por stream | 2³² (4.29 mil millones) | Acotado por el nonce de 4 bytes |
+| Índice de chunk | uint32 | EOF necesita otro índice; no agotar el contador |
 | Tamaño del header | capsule + 16 B | 784/1104/1584 B para ML-KEM-512/768/1024 |
 | Overhead por frame | 4 + 16 = 20 B | Prefijo de longitud + tag |
 | Alineación de lectura | No requerida | `decrypt_stream` re-ensambla frames a través de límites de chunk |
@@ -167,10 +175,10 @@ Como el AAD es `chunk_index.to_be_bytes()`, swapear dos frames causa que sus tag
 
 ## ¿Por qué Generadores (y no Corutinas)?
 
-La API de streaming usa generadores de Python (`yield`) en lugar de corutinas asíncronas. La razón es **localidad de memoria**: las operaciones de AES-GCM liberan el GIL en Rust, así que el cifrado en streaming satura CPUs multi-core incluso desde un único generador. Si necesitás I/O no bloqueante para el loop de lectura/escritura circundante, envolvé la iteración de archivo en `asyncio.to_thread` o usá `aiofiles` por separado.
+Los generadores permiten procesamiento incremental y control de I/O. AES-GCM nativo libera el GIL, pero un único generador procesa bloques secuencialmente; liberar el GIL no implica saturar varios cores. En asyncio, delegue el bucle completo de lectura/cifrado/escritura a un worker, no solo la creación del generador lazy.
 
 ## Ver También
 
-- [`AegisCipher.encrypt_async` / `decrypt_async`](/api-reference/async-methods/) — variantes one-shot no bloqueantes
-- [Context Manager de `AegisCipher`](/api-reference/context-manager/) — zeroización proactiva para material con scope de sesión
-- [Hybrid KEM-DEM internals](/internals/hybrid-kem-dem/) — cómo se estructura el Transit Package
+- [`AegisCipher.encrypt_async` / `decrypt_async`](/es/api-reference/async-methods/) — variantes one-shot no bloqueantes
+- [Context Manager de `AegisCipher`](/es/api-reference/context-manager/) — limpieza de buffers registrados internamente y sus límites
+- [Hybrid KEM-DEM internals](/es/internals/hybrid-kem-dem/) — cómo se estructura el Transit Package

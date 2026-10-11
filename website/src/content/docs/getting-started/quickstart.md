@@ -48,7 +48,8 @@ capsule, shared_secret = kem.encapsulate(keypair.public_key)
 
 # Decapsulate: recovers the same 32-byte shared secret
 recovered = kem.decapsulate(capsule, keypair.secret_key)
-assert shared_secret == recovered
+import hmac
+assert hmac.compare_digest(shared_secret, recovered)
 ```
 
 ## What Happens Under the Hood?

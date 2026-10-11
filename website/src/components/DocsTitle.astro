@@ -1,0 +1,8 @@
+---
+const { siteTitleHref, locale, hasSidebar } = Astro.locals.starlightRoute;
+---
+
+<a class="aq-site-title" href={siteTitleHref}>
+	<span translate="no">AegisQ</span>
+	{hasSidebar && <span class="aq-site-label">{locale === 'es' ? 'Documentación' : 'Documentation'}</span>}
+</a>
