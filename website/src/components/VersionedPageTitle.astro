@@ -1,0 +1,14 @@
+---
+import DefaultPageTitle from '@astrojs/starlight/components/PageTitle.astro';
+import { channel, currentChannel } from '../docs-channels.mjs';
+const isSpanish = Astro.locals.starlightRoute.locale === 'es';
+---
+<DefaultPageTitle />
+{Astro.locals.starlightRoute.hasSidebar && <p class="aq-channel-status" data-doc-channel={channel}>
+	{channel === 'next'
+		? (isSpanish ? `Desarrollo ${currentChannel.version}: documentación preliminar, no es la versión estable de PyPI.` : `Development ${currentChannel.version}: prerelease documentation, not the stable PyPI release.`)
+		: (isSpanish ? `Documentación de la versión estable ${currentChannel.version}.` : `Documentation for stable release ${currentChannel.version}.`)}
+</p>}
+<style>
+	.aq-channel-status { margin-top: 0.75rem; padding: 0.75rem; border-inline-start: 3px solid var(--aq-accent); font-size: 0.875rem; color: var(--aq-text-muted); }
+</style>

@@ -70,7 +70,7 @@ async function request(target, pathname, status, destination) {
   if (status === 404) {
     const text = await response.text();
     assert.match(text, /name="robots" content="noindex/);
-    assert(text.includes(pathname.startsWith('/es/') ? 'Esta dirección' : 'There is no page'), `Wrong 404 locale: ${target}${pathname}`);
+    assert(text.includes(pathname.replace(/^\/next/, '').startsWith('/es/') ? 'Esta dirección' : 'There is no page'), `Wrong 404 locale: ${target}${pathname}`);
   }
   responses++;
 }
@@ -92,12 +92,19 @@ try {
   await request('docs', '/es/', 302, '/es/getting-started/installation/');
   await request('home', '/api-reference/aegiscipher/', 301, `${origins.docs}/api-reference/aegiscipher/`);
   await request('home', '/es/api-reference/aegiscipher/', 301, `${origins.docs}/es/api-reference/aegiscipher/`);
+  await request('home', '/next/es/api-reference/aegiscipher/', 301, `${origins.docs}/next/es/api-reference/aegiscipher/`);
+  for (const locale of ['', 'es/']) {
+    await request('docs', `/next/${locale}`, 302, `/next/${locale}getting-started/installation/`);
+    await request('docs', `/next/${locale}api-reference/aegiscipher/`, 200);
+    await request('docs', `/next/${locale}unknown-hosting-check/`, 404);
+  }
+  await request('docs', '/next/pagefind/pagefind-entry.json', 200);
 
   // Browsers are optional locally; CI provisions a pinned browser explicitly.
   if (process.env.HOSTING_BROWSER === '1') {
     const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
     browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH, headless: true });
-    for (const width of [375, 1440]) {
+    for (const width of [320, 375, 768, 1440]) {
       for (const language of ['en', 'es']) {
         const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
         const unexpected = [];
@@ -147,7 +154,7 @@ try {
         await page.goto(origins.docs + new URL(page.url()).pathname, { waitUntil: 'networkidle' });
         assert(await page.locator('.aq-chapters').isVisible());
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
-        if (width === 375) await page.locator('starlight-menu-button button').click();
+        if (width < 800) await page.locator('starlight-menu-button button').click();
         const theme = page.locator('starlight-theme-select select:visible').first();
         await theme.selectOption('dark');
         assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
@@ -156,13 +163,37 @@ try {
         await locale.selectOption(new URL(alternate).pathname);
         await page.waitForURL(alternate);
         assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+        // Version switches retain page, locale, hash and native theme state.
+        await page.goto(`${alternate}#generate_keypair`, { waitUntil: 'networkidle' });
+        await page.locator('.aq-doc-version select').selectOption(`/next${new URL(alternate).pathname}`);
+        await page.waitForURL(`${origins.docs}/next${new URL(alternate).pathname}#generate_keypair`);
+        await page.waitForLoadState('networkidle');
+        assert.equal(await page.locator('[data-doc-channel]').getAttribute('data-doc-channel'), 'next');
+        assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+        await page.locator('site-search button[data-open-modal]').click();
+        await page.locator('.pagefind-ui__search-input').fill('AegisCipher');
+        await page.locator('.pagefind-ui__result-link').first().waitFor();
+        const nextPrefix = language === 'es' ? '/next/' : '/next/es/';
+        const resultPaths = await page.locator('.pagefind-ui__result-link').evaluateAll((links) => links.map((link) => new URL(link.href).pathname));
+        assert(resultPaths.length > 0 && resultPaths.every((pathname) => pathname.startsWith(nextPrefix) && pathname.startsWith('/next/es/') === (language === 'en')));
+        await page.keyboard.press('Escape');
+        if (width < 800) await page.locator('starlight-menu-button button').click();
+        const nextPath = `/next${prefix}api-reference/aegiscipher/`;
+        await page.locator('starlight-lang-select select:visible').first().selectOption(nextPath);
+        await page.waitForURL(`${origins.docs}${nextPath}#generate_keypair`);
+        await page.waitForLoadState('networkidle');
+        assert.equal(await page.locator('html').getAttribute('lang'), language);
+        await page.locator('.aq-doc-version select').selectOption(`${prefix}api-reference/aegiscipher/`);
+        await page.waitForURL(`${origins.docs}${prefix}api-reference/aegiscipher/#generate_keypair`);
+        await page.waitForLoadState('networkidle');
+        assert.equal(await page.locator('[data-doc-channel]').getAttribute('data-doc-channel'), 'stable');
         await page.locator('a.aq-site-title').click();
-        await page.waitForURL(origins.home + (language === 'es' ? '/' : '/es/'));
+        await page.waitForURL(origins.home + prefix);
         await page.waitForLoadState('networkidle');
         assert(await page.locator('.aq-landing').isVisible());
         assert.deepEqual(errors, []);
         assert.deepEqual(unexpected, []);
-        layouts.push({ width, language, search: 'home → docs', locale: 'switched', homeRecovery: 'passed' });
+        layouts.push({ width, language, search: 'isolated stable/next', locale: 'switched in both channels', versions: 'round trip', homeRecovery: 'passed' });
         await context.unrouteAll({ behavior: 'wait' });
         await context.close();
       }

@@ -1,5 +1,6 @@
 ---
 import DefaultHeader from '@astrojs/starlight/components/Header.astro';
+import DocsVersion from './DocsVersion.astro';
 
 const { locale, id } = Astro.locals.starlightRoute;
 const isLanding = Astro.locals.starlightRoute.entry.data.template === 'splash';
@@ -32,6 +33,7 @@ const chapters = [
 
 <div class="aq-masthead"><DefaultHeader /></div>
 {!isLanding && <nav class="aq-chapters" aria-label={isSpanish ? 'Secciones de documentación' : 'Documentation sections'}>
+	{Astro.locals.starlightRoute.hasSidebar && <DocsVersion />}
 	{
 		chapters.map((chapter) => (
 			<a href={`${prefix}${chapter.path}`} aria-current={section === chapter.section ? 'location' : undefined}>

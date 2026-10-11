@@ -38,28 +38,31 @@ for (const [target, origin] of Object.entries(origins)) {
       const text = await readFile(path.join(directory, file), 'utf8');
       assert(!text.includes('aegisq-pqc.readthedocs.io'), `Old host in ${file}`);
       assert(!/<option[^>]*value="https?:/.test(text), `Locale options must remain pathnames: ${file}`);
-      assert(text.includes(`class="aq-site-title" href="${origins.home}/${file.startsWith('es/') ? 'es/' : ''}"`), `Brand link must recover the localized home: ${file}`);
+      assert(text.includes(`class="aq-site-title" href="${origins.home}/${file.replace(/^next\//, '').startsWith('es/') ? 'es/' : ''}"`), `Brand link must recover the localized home: ${file}`);
       html.set(`${target}/${file}`, text);
       const error = /(?:^|\/)404(?:\/index)?\.html$/.test(file);
       if (error) assert.match(text, /name="robots" content="noindex/);
       else assert(text.includes(`rel="canonical" href="${origin}/`), `Wrong canonical in ${file}`);
+      if (file.startsWith('next/')) assert.match(text, /name="robots" content="noindex/);
     }
   }
   assert(files.includes('404.html') && files.includes('es/404.html'));
   assert(files.includes('pagefind/pagefind.js'), 'Search index missing');
   const sitemap = await readFile(path.join(directory, 'sitemap.xml'), 'utf8');
   const locations = [...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map((match) => match[1]);
-  const indexable = files.filter((file) => file.endsWith('.html') && !/(?:^|\/)404(?:\/index)?\.html$/.test(file));
+  const indexable = files.filter((file) => file.endsWith('.html') && !file.startsWith('next/') && !/(?:^|\/)404(?:\/index)?\.html$/.test(file));
   assert.equal(locations.length, indexable.length);
   if (target === 'home') assert.equal(locations.length, 2);
   assert(locations.every((url) => url.startsWith(`${origin}/`) && !url.includes('/404')));
-  const search = JSON.parse(await readFile(path.join(directory, 'pagefind/pagefind-entry.json'), 'utf8'));
-  assert.deepEqual(Object.keys(search.languages).sort(), ['en', 'es']);
-  for (const language of ['en', 'es']) {
-    const docsDirectory = path.join(website, 'dist/cloudflare/docs');
-    const docsFiles = await walk(docsDirectory);
-    const expected = docsFiles.filter((file) => file.endsWith('/index.html') && !file.includes('/404/') && file.startsWith('es/') === (language === 'es'));
-    assert.equal(search.languages[language].page_count, expected.length, `${language} search index excludes homes/errors`);
+  for (const base of target === 'docs' ? ['', 'next/'] : ['']) {
+    const search = JSON.parse(await readFile(path.join(directory, base, 'pagefind/pagefind-entry.json'), 'utf8'));
+    assert.deepEqual(Object.keys(search.languages).sort(), ['en', 'es']);
+    for (const language of ['en', 'es']) {
+      const docsDirectory = path.join(website, 'dist/cloudflare/docs');
+      const docsFiles = await walk(docsDirectory);
+      const expected = docsFiles.filter((file) => file.startsWith('next/') === Boolean(base) && file.endsWith('/index.html') && !file.includes('/404/') && file.slice(base.length).startsWith('es/') === (language === 'es'));
+      assert.equal(search.languages[language].page_count, expected.length, `${base}${language} search index excludes homes/errors`);
+    }
   }
   assert.equal(files.includes('index.html'), target === 'home');
   assert.equal(files.includes('es/index.html'), target === 'home');
@@ -72,6 +75,13 @@ function resolve(url) {
   if (!target) return;
   if (target === 'docs' && ['/', '/es', '/es/'].includes(url.pathname)) {
     url.pathname = `${url.pathname.startsWith('/es') ? '/es' : ''}/getting-started/installation/`;
+  }
+  if (target === 'docs' && ['/next', '/next/', '/next/es', '/next/es/'].includes(url.pathname)) {
+    url.pathname = `/next${url.pathname.includes('/es') ? '/es' : ''}/getting-started/installation/`;
+  }
+  if (target === 'home' && url.pathname.startsWith('/next')) {
+    url.host = new URL(origins.docs).host;
+    return resolve(url);
   }
   if (target === 'home' && /^\/(es\/)?(getting-started|api-reference|internals|reference)\//.test(url.pathname)) {
     url.host = new URL(origins.docs).host;
