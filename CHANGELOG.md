@@ -9,6 +9,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+### Fixed
+- **Compatibilidad de compilación con Rust 1.99 y macOS ARM** — El lockfile
+  actualiza PyO3 a 0.29.3 para corregir `clippy::clone_on_copy` generado por
+  `#[pyclass(from_py_object)]`. La opción `target-cpu=x86-64-v3` se limita a
+  destinos x86-64; ARM conserva los valores predeterminados del compilador.
+  Se mantienen `abi3-py311`, las comprobaciones de overflow en release y la
+  política de Clippy sin supresiones.
+
 ### Changed
 - **Version bump en `develop` a `1.6.0-rc1`** — Después de publicar `v1.5.0`
   a PyPI, `develop` debe estar en la prerelease de la siguiente versión

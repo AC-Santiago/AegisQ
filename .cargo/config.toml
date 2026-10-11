@@ -1,4 +1,4 @@
-# Flags de compilacion globales para AegisQ
+# Flags de compilacion para destinos x86-64 de AegisQ
 # Optimizaciones de seguridad y rendimiento
 #
 # Usa `target-cpu=x86-64-v3` (microarch level) en vez de `target-cpu=native`.
@@ -13,6 +13,8 @@
 # ubuntu-24.04 paso a 20260810.271). El crate `aes` hace deteccion de
 # CPU en runtime via `cpufeatures`, asi que AES-NI sigue acelerando
 # el codigo aunque el binario no se compile con la extension forzada.
+# No aplicar este CPU a ARM: los destinos AArch64 conservan su CPU y sus
+# extensiones ABI predeterminados, incluido NEON en macOS ARM.
 
-[build]
+[target.'cfg(target_arch = "x86_64")']
 rustflags = ["-C", "target-cpu=x86-64-v3"]
