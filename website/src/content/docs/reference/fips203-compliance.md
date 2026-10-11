@@ -1,70 +1,20 @@
 ---
 title: FIPS 203 Compliance
-description: AegisQ implementation history, standards references, dependency requirements, and test-vector scope.
+description: Standards references, implementation boundaries, dependency requirements, and test-vector scope.
 ---
 
-## Implementation Roadmap
+## Implementation Scope
 
-AegisQ was developed in phases. The tables below describe implemented components and historical releases, not certification or a current test-run result. Published versions are listed on [PyPI](https://pypi.org/project/aegisq-pqc/); checkout versions live in the package manifests, and release history is recorded in `CHANGELOG.md`.
+AegisQ implements ML-KEM for key encapsulation and AES-256-GCM for authenticated encryption. Published versions are listed on [PyPI](https://pypi.org/project/aegisq-pqc/); checkout versions live in the package manifests. Release history is maintained in the repository's [CHANGELOG.md](https://github.com/AC-Santiago/AegisQ/blob/main/CHANGELOG.md).
 
 :::caution[Implementation is not certification]
 FIPS 203 specifies ML-KEM. Implementing it and running known-answer tests does not constitute official ACVP validation, FIPS 140 module certification, or an independent audit of AegisQ. The streaming frame format and ML-KEM PEM-like envelopes are AegisQ formats, not standardized by the references below.
 :::
 
-### v1.0–v1.2 — Core FIPS 203 ML-KEM + Hybrid KEM-DEM
-
-| Phase | Component | Reference | Status |
-|-------|-----------|-----------|--------|
-| 1 | Field arithmetic (Zq) & Barrett reduction | FIPS 203 §4.2 | ✅ |
-| 2 | NTT & inverse NTT | FIPS 203 §4.3 | ✅ |
-| 3 | Polynomial operations | FIPS 203 §4.1 | ✅ |
-| 4 | Compress / Decompress | FIPS 203 §4.2.1 | ✅ |
-| 5 | Parameters module | FIPS 203 §5 | ✅ |
-| 6 | CBD sampling & XOF | FIPS 203 §4.1, §4.2.2 | ✅ |
-| 7 | KeyGen (Algorithm 15) | FIPS 203 Alg. 15 | ✅ |
-| 8 | Encaps (Algorithm 16) | FIPS 203 Alg. 16 | ✅ |
-| 9 | Decaps with implicit rejection | FIPS 203 Alg. 17 | ✅ |
-| 10 | Public KEM API (`kem.rs`) | — | ✅ |
-| 11 | AES-256-GCM Hybrid (`hybrid.rs`) | NIST SP 800-38D | ✅ |
-| 12 | FFI error types | — | ✅ |
-| 13 | PyO3 types (KeyPair, SecurityLevel) | — | ✅ |
-| 14 | PyO3 KEM bindings | — | ✅ |
-| 15 | PyO3 Hybrid bindings | — | ✅ |
-| 16 | PyO3 module registration | — | ✅ |
-| 17 | Python exceptions | — | ✅ |
-| 18 | Python type stubs | PEP 561 | ✅ |
-| 19 | Python KEM API (`MlKem`) | — | ✅ |
-| 20 | Python high-level API (`AegisCipher`) | — | ✅ |
-| 21 | Python package exports | — | ✅ |
-| 22 | KEM bridge tests | — | ✅ |
-| 23 | Hybrid bridge tests | — | ✅ |
-| 24 | AegisCipher end-to-end tests | — | ✅ |
-| 25 | KEM API tests + NIST KAT vectors | — | ✅ |
-| 26 | GitHub Actions CI/CD | — | ✅ |
-| 27 | NIST ACVP KAT vector JSON files | NIST vectors | ✅ |
-| 27b | KAT vector verification tests | NIST vectors | ✅ |
-| 28 | EphemeralSession (session keypair lifecycle) | — | ✅ |
-| 29 | Async support (`encrypt_async`, `decrypt_async`) | — | ✅ |
-
-### v1.3.0 — KDF, Key Wrap, and Key Serialization
-
-| Phase | Component | Reference | Status |
-|-------|-----------|-----------|--------|
-| 30 | HKDF-SHA3-256 + AES-256-GCM key wrap (`kdf.rs`, `key_wrap.rs`) | RFC 5869, NIST SP 800-38D | ✅ |
-| 31 | Key serialization: PEM, JSON, encrypted PEM (`key_io_bindings.rs`, `aegisq/keys.py`) | RFC 7468 (adapted) | ✅ |
-
-### v1.4.0 — Safe Repr, Context Manager, Implicit-Rejection Coverage
-
-| Phase | Component | Reference | Status |
-|-------|-----------|-----------|--------|
-| 32 | `KeyPair.__repr__` fingerprint + `AegisCipher` context manager + 25-case `__repr__` regression suite + 25-case implicit-rejection regression suite (FIPS 203 §7.3) | FIPS 203 §7.3 | ✅ |
-
-### v1.5.0 — Streaming + Benchmarks
-
-| Phase | Component | Reference | Status |
-|-------|-----------|-----------|--------|
-| 33a | Streaming encrypt/decrypt (`stream.rs`, `stream_bindings.rs`, `encrypt_stream` / `decrypt_stream`) | AES-GCM primitive: SP 800-38D; framing: AegisQ-specific | ✅ |
-| 33b | Criterion benchmarks for NTT and KEM (`benches/ntt.rs`, `benches/kem.rs`) | — | ✅ |
+- [Mathematical foundation](/internals/mathematical-foundation/) explains the ML-KEM primitives and parameters.
+- [Hybrid KEM-DEM](/internals/hybrid-kem-dem/) describes the one-shot transit package.
+- [Key serialization](/api-reference/key-serialization/) and [streaming](/api-reference/streaming/) describe AegisQ-specific formats and derivation.
+- [Security model](/internals/security-model/) separates implemented defenses from guarantees the library does not provide.
 
 ## Standards Compliance
 
@@ -79,16 +29,16 @@ FIPS 203 specifies ML-KEM. Implementing it and running known-answer tests does n
 
 ## Rust Dependencies
 
-Versions are current manifest requirements, not exact lockfile resolutions or a historical v1.5.0 inventory. Workspace declarations live in `Cargo.toml`; PyO3 and Criterion are declared in the bridge/core manifests. `Cargo.lock` records resolved versions.
+Versions are current manifest requirements, not exact lockfile resolutions or an inventory of a published release. Workspace declarations live in `Cargo.toml`; PyO3 and Criterion are declared in the bridge/core manifests. `Cargo.lock` records resolved versions.
 
 | Crate | Version | Purpose | `no_std` |
 |-------|---------|---------|----------|
 | `aes-gcm` | 0.11 | AES-256-GCM authenticated encryption (hardware AES-NI) | ✅ |
 | `sha3` | 0.12 | SHA3-256/512 for ML-KEM | ✅ |
 | `shake` | 0.1 | XOF variants moved out of `sha3` upstream (RustCrypto/XOFs split) | ✅ |
-| `zeroize` | 1.9 | Secure memory erasure of secrets | ✅ |
+| `zeroize` | 1.9 | Cleanup of selected secret buffers | ✅ |
 | `subtle` | 2.6 | Constant-time comparisons | ✅ |
-| `getrandom` | 0.4 | OS-level CSPRNG (`OsRng`) for nonces and keygen | ✅ |
+| `getrandom` | 0.4 | OS-level randomness for nonces and keygen | ✅ |
 | `base64` | 0.23 | PEM body encoding | ✅ |
 | `thiserror` | 2.0 | Error type definitions | ✅ |
 | `pyo3` | 0.29 | Rust-Python FFI bindings (`abi3-py311`) | — |
