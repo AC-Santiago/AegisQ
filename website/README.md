@@ -104,8 +104,10 @@ node website/scripts/verify-ui.mjs
 
 The checks cover the bilingual overview and AegisCipher pages at 375, 768, 1024,
 and 1440 pixels in both themes, plus keyboard navigation, mobile menu state,
-search, language/theme switching, and reduced motion. Reports and screenshots
-are development-only artifacts in `../.impeccable/review/` and are not served.
+icon centering in both open/closed states, the 44px menu target, the 799/800px
+mobile breakpoint, desktop menu visibility, search, language/theme switching,
+and reduced motion. Reports and screenshots are development-only artifacts in
+`../.impeccable/review/` and are not served.
 No browser or package is installed by this script. This smoke matrix is not a
 full accessibility audit or a cross-browser conformance claim.
 
