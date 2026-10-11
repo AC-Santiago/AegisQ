@@ -44,3 +44,11 @@ Thumbs.db
 .opencode/
 opencode.json
 .atl/
+
+# Local design decisions, previews, reports, and agent mirrors (not product source)
+/.impeccable/
+/.codex/
+/.agents/skills/impeccable/
+/.github/agents/impeccable-*.agent.md
+/.github/hooks/impeccable.json
+/.github/skills/impeccable/

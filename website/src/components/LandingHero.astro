@@ -1,0 +1,87 @@
+---
+import DefaultHero from '@astrojs/starlight/components/Hero.astro';
+import NotFoundHero from './NotFoundHero.astro';
+import { Code } from '@astrojs/starlight/components';
+import '../styles/landing.css';
+
+const { entry, locale, siteTitleHref } = Astro.locals.starlightRoute;
+const isNotFound = entry.id === '404' || entry.id.endsWith('/404');
+const isLanding = entry.data.template === 'splash'
+  && Astro.url.pathname.replace(/\/$/, '') === siteTitleHref.replace(/\/$/, '');
+const isSpanish = locale === 'es';
+const prefix = `${import.meta.env.BASE_URL}${isSpanish ? 'es/' : ''}`;
+const href = (path: string) => `${prefix}${path}/`;
+const copy = isSpanish ? {
+  title: 'Cifrado híbrido.', subtitle: 'Un camino claro en Python.',
+  intro: 'AegisQ combina encapsulación de claves ML-KEM y cifrado autenticado AES-256-GCM mediante una API Python respaldada por un núcleo en Rust.',
+  action: 'Abrir los docs', example: 'Su primer cifrado y descifrado', install: 'Instalación',
+  default: 'Python 3.11 o posterior. ML-KEM-768 por defecto.', docs: 'Documentación',
+  paths: ['Instalación', 'Inicio rápido', 'Referencia de API', 'Modelo de seguridad', 'Diseño híbrido'],
+  package: 'Un paquete. Cuatro partes ordenadas.', capsule: 'Capsule ML-KEM',
+  capsuleDetail: 'Encapsulación de claves', nonce: 'Nonce AES', tag: 'Tag de autenticación',
+  ciphertext: 'Ciphertext', payload: 'Payload cifrado', bytes: 'bytes',
+  caption: 'Formato one-shot del Transit Package. Ilustración no proporcional al tamaño en bytes.',
+  diagramLink: 'Entender el diseño híbrido',
+  trust: 'El emisor cifra con la clave pública del destinatario; este mantiene privada la clave secreta. Obtenga las claves públicas mediante un canal confiable. El ejemplo usa un par de claves local; AES-GCM no demuestra la identidad del emisor.',
+  continue: 'Continuar con el inicio rápido',
+} : {
+  title: 'Hybrid encryption.', subtitle: 'A clear Python path.',
+  intro: 'AegisQ pairs ML-KEM key encapsulation with AES-256-GCM authenticated encryption through a Python API backed by a Rust core.',
+  action: 'Open the docs', example: 'Your first roundtrip', install: 'Installation',
+  default: 'Python 3.11 or later. ML-KEM-768 by default.', docs: 'Documentation',
+  paths: ['Installation', 'Quick start', 'API reference', 'Security model', 'Hybrid design'],
+  package: 'One package. Four ordered parts.', capsule: 'ML-KEM capsule',
+  capsuleDetail: 'Key encapsulation', nonce: 'AES nonce', tag: 'Auth tag',
+  ciphertext: 'Ciphertext', payload: 'Encrypted payload', bytes: 'bytes',
+  caption: 'One-shot Transit Package format. Illustration is not to scale in bytes.',
+  diagramLink: 'Understand the hybrid design',
+  trust: 'The sender encrypts with the recipient’s public key; the recipient keeps the secret key private. Obtain public keys through a trusted channel. The example uses one keypair locally; AES-GCM does not establish the sender’s identity.',
+  continue: 'Continue with the quick start',
+};
+const paths = ['getting-started/installation', 'getting-started/quickstart', 'api-reference/aegiscipher', 'internals/security-model', 'internals/hybrid-kem-dem'];
+const roundtrip = `from aegisq import AegisCipher
+
+cipher = AegisCipher()
+keypair = cipher.generate_keypair()
+
+package = cipher.encrypt(b"Hello, AegisQ", keypair.public_key)
+plaintext = cipher.decrypt(package, keypair.secret_key)
+assert plaintext == b"Hello, AegisQ"`;
+const segments = [
+  { label: copy.capsule, detail: copy.capsuleDetail },
+  { label: copy.nonce, detail: `12 ${copy.bytes}` },
+  { label: copy.tag, detail: `16 ${copy.bytes}` },
+  { label: copy.ciphertext, detail: copy.payload },
+];
+---
+
+{isLanding ? (
+  <div class="aq-landing">
+    <div class="aq-desk">
+      <section class="aq-introduction" aria-labelledby="_top">
+        <h1 id="_top" data-page-title>{copy.title}<span>{copy.subtitle}</span></h1>
+        <p>{copy.intro}</p>
+        <a class="aq-open-docs" href={href(paths[0])}>{copy.action}</a>
+      </section>
+      <section class="aq-example" aria-labelledby="aq-example-title">
+        <h2 id="aq-example-title">{copy.example}</h2>
+        <Code code={roundtrip} lang="python" />
+        <h3>{copy.install}</h3>
+        <Code code="python -m pip install aegisq-pqc" lang="bash" />
+        <p class="aq-example-note">{copy.default}</p>
+      </section>
+      <nav class="aq-entry-paths" aria-labelledby="aq-paths-title">
+        <h2 id="aq-paths-title">{copy.docs}</h2>
+        <ul>{paths.map((path, index) => <li><a href={href(path)}>{copy.paths[index]}</a></li>)}</ul>
+      </nav>
+    </div>
+    <figure class="aq-packet" aria-labelledby="aq-packet-caption">
+      <figcaption id="aq-packet-caption">{copy.package}</figcaption>
+      <ol class="aq-packet-parts">
+        {segments.map((segment) => <li><strong>{segment.label}</strong><span>{segment.detail}</span></li>)}
+      </ol>
+      <div class="aq-packet-notes"><p>{copy.caption}</p><a href={href('internals/hybrid-kem-dem')}>{copy.diagramLink}</a></div>
+    </figure>
+    <div class="aq-roundtrip-context"><p>{copy.trust}</p><a href={href('getting-started/quickstart')}>{copy.continue}</a></div>
+  </div>
+) : isNotFound ? <NotFoundHero /> : <DefaultHero />}
