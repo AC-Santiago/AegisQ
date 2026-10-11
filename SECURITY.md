@@ -2,16 +2,26 @@
 
 ## Versiones soportadas
 
-| Versión | Soporte de seguridad |
+| Línea de versiones | Soporte de seguridad |
 |---|---|
-| 1.2.x | ✅ Activo |
-| 1.1.x | ✅ Activo |
-| 1.0.x | ✅ Mantenimiento (parches de seguridad únicamente) |
+| Última línea estable publicada en PyPI | Recibe correcciones de seguridad |
+| Líneas estables anteriores | Sin nuevos parches; actualizar a la línea soportada |
+| Prereleases (`rc`, alpha, beta) | Para evaluación; sin compromiso de soporte estable |
 
-Esta tabla conserva la política publicada para las ramas anteriores; no define
-el soporte de las versiones posteriores a 1.2.x. La matriz debe actualizarse
-mediante una decisión explícita de mantenimiento. Consulte `CHANGELOG.md` y
-los metadatos de PyPI para identificar releases, no para inferir su soporte.
+Una línea estable corresponde a `major.minor.x`. El soporte se concentra en
+la línea de la versión estable más reciente publicada en
+[PyPI](https://pypi.org/project/aegisq-pqc/), no en la versión del checkout ni en
+una prerelease. Dentro de esa línea, use el último patch disponible: los arreglos
+se entregan mediante nuevas versiones, no modificando paquetes ya publicados.
+
+Al publicarse una línea estable posterior, la anterior deja de recibir nuevos
+parches. No se mantienen backports a líneas anteriores. Esta política sustituye
+los compromisos de soporte anteriores; los usuarios de esas líneas deben
+actualizar para recibir correcciones de seguridad.
+
+El canal privado de reporte siguiente sigue disponible, pero un reporte sobre
+una línea sin soporte no implica el compromiso de publicar un parche para ella.
+Consulte [CHANGELOG.md](CHANGELOG.md) para el historial de releases.
 
 ## Reporte de vulnerabilidades
 
