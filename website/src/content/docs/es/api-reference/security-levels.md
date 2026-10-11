@@ -3,7 +3,7 @@ title: Niveles de Seguridad
 description: Niveles de seguridad ML-KEM — tamaños de clave, tamaños de capsule y overhead de paquete para ML-KEM-512, 768 y 1024.
 ---
 
-AegisQ soporta los tres niveles de seguridad ML-KEM definidos en FIPS 203. El default es **ML-KEM-768** (NIST Nivel 3), que provee un balance óptimo de seguridad y rendimiento para la mayoría de las aplicaciones.
+AegisQ admite los tres conjuntos de parámetros ML-KEM de FIPS 203. El predeterminado es **ML-KEM-768** (categoría NIST 3). Seleccione parámetros según su protocolo, modelo de amenazas y requisitos de interoperabilidad; una categoría no certifica esta implementación.
 
 ## Comparación de Niveles de Seguridad
 
@@ -13,13 +13,15 @@ AegisQ soporta los tres niveles de seguridad ML-KEM definidos en FIPS 203. El de
 | ML-KEM-768 | `SecurityLevel.ML_KEM_768` | 3 (default) | 1184 B | 2400 B | 1088 B | 1116 B |
 | ML-KEM-1024 | `SecurityLevel.ML_KEM_1024` | 5 | 1568 B | 3168 B | 1568 B | 1596 B |
 
-**Overhead del paquete** = capsule + AES nonce (12 B) + AES auth tag (16 B). El tamaño total del paquete cifrado es overhead + longitud del plaintext.
+**Overhead del paquete one-shot** = capsule + AES nonce (12 B) + AES auth tag (16 B). El tamaño total one-shot es overhead + longitud del plaintext. Streaming usa otro formato de header/frames.
 
 ## Niveles de Seguridad NIST Explicados
 
-- **Nivel 1** — Al menos tan difícil de romper como AES-128. Adecuado para protección de datos de corto plazo.
-- **Nivel 3** — Al menos tan difícil de romper como AES-192. Recomendado para la mayoría de las aplicaciones. **(Default)**
-- **Nivel 5** — Al menos tan difícil de romper como AES-256. Máxima seguridad para los datos más sensibles.
+- **Categoría 1** — Usa la búsqueda exhaustiva de claves AES-128 como objetivo de comparación NIST.
+- **Categoría 3** — Usa la búsqueda exhaustiva de claves AES-192 como objetivo de comparación. **Predeterminado de AegisQ.**
+- **Categoría 5** — Usa la búsqueda exhaustiva de claves AES-256 como objetivo de comparación.
+
+Son categorías de seguridad del algoritmo, no garantías de un período de retención ni equivalencias literales de seguridad en bits para todo ataque. Los tres modos híbridos usan **AES-256-GCM** para el payload.
 
 ## Uso
 
@@ -30,9 +32,9 @@ from aegisq import AegisCipher, SecurityLevel
 cipher = AegisCipher()
 
 # Selección explícita del nivel
-cipher_512 = AegisCipher(level=SecurityLevel.ML_KEM_512)    # Más rápido, claves más pequeñas
-cipher_768 = AegisCipher(level=SecurityLevel.ML_KEM_768)    # Recomendado (default)
-cipher_1024 = AegisCipher(level=SecurityLevel.ML_KEM_1024)  # Máxima seguridad
+cipher_512 = AegisCipher(level=SecurityLevel.ML_KEM_512)    # Categoría 1, claves más pequeñas
+cipher_768 = AegisCipher(level=SecurityLevel.ML_KEM_768)    # Categoría 3 (predeterminado)
+cipher_1024 = AegisCipher(level=SecurityLevel.ML_KEM_1024)  # Categoría 5, claves más grandes
 ```
 
 ## Parámetros del Núcleo (FIPS 203)
@@ -48,5 +50,5 @@ Estos son los parámetros internos de ML-KEM para cada nivel de seguridad:
 Donde:
 - **k** — Dimensión del módulo (número de vectores de polinomios)
 - **η₁, η₂** — Parámetros de muestreo CBD para los términos de error
-- **dᵤ, d�** — Anchos de bits de compresión
+- **dᵤ, dᵥ** — Anchos de bits de compresión
 - **pk** — Clave pública, **sk** — Clave secreta, **ct** — Ciphertext (capsule), **ss** — Shared secret

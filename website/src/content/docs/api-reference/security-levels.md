@@ -3,7 +3,7 @@ title: Security Levels
 description: ML-KEM security levels — key sizes, capsule sizes, and package overhead for ML-KEM-512, 768, and 1024.
 ---
 
-AegisQ supports all three ML-KEM security levels defined in FIPS 203. The default is **ML-KEM-768** (NIST Level 3), which provides a balance of security and performance suitable for most applications.
+AegisQ supports the three ML-KEM parameter sets defined in FIPS 203. The default is **ML-KEM-768** (NIST category 3). Select parameters according to your protocol, threat model, and interoperability requirements; a category is not a certification of this implementation.
 
 ## Security Level Comparison
 
@@ -13,13 +13,15 @@ AegisQ supports all three ML-KEM security levels defined in FIPS 203. The defaul
 | ML-KEM-768 | `SecurityLevel.ML_KEM_768` | 3 (default) | 1184 B | 2400 B | 1088 B | 1116 B |
 | ML-KEM-1024 | `SecurityLevel.ML_KEM_1024` | 5 | 1568 B | 3168 B | 1568 B | 1596 B |
 
-**Package overhead** = capsule + AES nonce (12 B) + AES auth tag (16 B). The total encrypted package size is overhead + plaintext length.
+**One-shot package overhead** = capsule + AES nonce (12 B) + AES auth tag (16 B). The total one-shot package size is overhead + plaintext length. Streaming uses a separate header/frame format.
 
 ## NIST Security Levels Explained
 
-- **Level 1** — At least as hard to break as AES-128. Suitable for short-term data protection.
-- **Level 3** — At least as hard to break as AES-192. Recommended for most applications. **(Default)**
-- **Level 5** — At least as hard to break as AES-256. Maximum security for the most sensitive data.
+- **Category 1** — Uses exhaustive AES-128 key search as the NIST comparison target.
+- **Category 3** — Uses exhaustive AES-192 key search as the comparison target. **AegisQ default.**
+- **Category 5** — Uses exhaustive AES-256 key search as the comparison target.
+
+These are algorithm security categories, not guarantees of a data-retention period or literal bit-security equivalence for every attack. All three hybrid modes still use **AES-256-GCM** for the payload.
 
 ## Usage
 
@@ -30,9 +32,9 @@ from aegisq import AegisCipher, SecurityLevel
 cipher = AegisCipher()
 
 # Explicit level selection
-cipher_512 = AegisCipher(level=SecurityLevel.ML_KEM_512)    # Fastest, smallest keys
-cipher_768 = AegisCipher(level=SecurityLevel.ML_KEM_768)    # Recommended (default)
-cipher_1024 = AegisCipher(level=SecurityLevel.ML_KEM_1024)  # Maximum security
+cipher_512 = AegisCipher(level=SecurityLevel.ML_KEM_512)    # Category 1, smallest keys
+cipher_768 = AegisCipher(level=SecurityLevel.ML_KEM_768)    # Category 3 (default)
+cipher_1024 = AegisCipher(level=SecurityLevel.ML_KEM_1024)  # Category 5, largest keys
 ```
 
 ## Core Parameters (FIPS 203)
