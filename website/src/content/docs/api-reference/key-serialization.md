@@ -23,8 +23,10 @@ The module is **v1.3.0** and lives in `aegisq/keys.py`. Every function accepts e
 | `public_key_to_json` | KeyPair → str | JSON | None |
 | `secret_key_to_pem` | KeyPair → str | Encrypted PEM | AES-256-GCM (HKDF-SHA3-256) |
 
-:::caution[Secret keys are always encrypted]
-There is no API to save or export a secret key in plaintext. The `save_secret_key` / `load_secret_key` / `secret_key_to_pem` functions all require a `password: bytes` argument — losing it means losing the key.
+:::caution[Persistence helpers encrypt; raw keys remain accessible]
+`save_secret_key` and `secret_key_to_pem` encrypt exports; `load_secret_key` returns plaintext `bytes`. All require `password: bytes`, but `KeyPair.secret_key` remains available without a password.
+
+HKDF-SHA3-256 is not password hardening. Use high-entropy secret bytes, not a weak human password, and retain them securely for recovery. The examples use `secrets.token_bytes(32)`; applications must store that secret separately from the encrypted key.
 :::
 
 ## Public-Key Persistence
@@ -114,14 +116,16 @@ The file looks like:
 -----END ENCRYPTED ML-KEM PRIVATE KEY-----
 ```
 
-The body contains a magic/version header, a fresh random 12-byte nonce, the AES-GCM ciphertext, and a 16-byte auth tag. A fresh nonce is generated per call via `OsRng`, so saving the same keypair twice produces **different** output.
+The blob contains `magic || version || level_id || salt (16 B) || nonce (12 B) || ciphertext || tag (16 B)`. The bridge uses `getrandom::fill` for fresh salt and nonce and propagates RNG failures; repeat exports are randomized, not guaranteed distinct.
 
 **Raises:** `RngError` if the OS CSPRNG is unavailable; `OSError` on filesystem failure.
 
 ```python
 from aegisq.keys import save_secret_key
 
-save_secret_key(keypair, "private.key", password=b"s3cr3t p@ssw0rd")
+import secrets
+password = secrets.token_bytes(32)  # Retain securely for later recovery
+save_secret_key(keypair, "private.key", password=password)
 ```
 
 ### `load_secret_key`
@@ -140,12 +144,12 @@ Reads an Encrypted PEM file, verifies the auth tag, and returns the secret key a
 ```python
 from aegisq.keys import load_secret_key
 
-sk = load_secret_key("private.key", password=b"s3cr3t p@ssw0rd")
+sk = load_secret_key("private.key", password=password)
 plaintext = cipher.decrypt(encrypted_package, sk)
 ```
 
 :::note[Wrong password vs. tampered file]
-Both surface as `DecryptionError`. AES-GCM auth-tag verification is binary — the only signal the library gets is "valid" or "invalid". A wrong password and a corrupted file look identical to the caller, by design.
+For a structurally valid blob, a wrong password or tampered authenticated ciphertext/tag surfaces as `DecryptionError`. Malformed envelopes or headers can instead raise `KeySerializationError`; not every corrupted file reaches authentication.
 :::
 
 ## String-Only Convenience Functions
@@ -189,12 +193,14 @@ from aegisq.keys import (
 cipher = AegisCipher()
 keypair = cipher.generate_keypair()
 save_public_key(keypair, "alice.pub.pem", fmt="pem")
-save_secret_key(keypair, "alice.sec.pem", password=b"hunter2")
+import secrets
+password = secrets.token_bytes(32)  # Store separately in a secret manager
+save_secret_key(keypair, "alice.sec.pem", password=password)
 
 # Later (or in another process): load back
 cipher = AegisCipher(level=SecurityLevel.ML_KEM_768)
 pub = load_public_key("alice.pub.pem", level=SecurityLevel.ML_KEM_768)
-sec = load_secret_key("alice.sec.pem", password=b"hunter2")
+sec = load_secret_key("alice.sec.pem", password=password)
 
 # Use as normal
 package = cipher.encrypt(b"secret message", pub)
@@ -217,8 +223,8 @@ assert plaintext == b"secret message"
 ```json
 {
   "algorithm": "ML-KEM",
-  "level": "ML-KEM-768",
-  "public_key": "<Base64 STANDARD>"
+  "level": "ML_KEM_768",
+  "public_key": "<Base64 URL-safe without padding>"
 }
 ```
 
@@ -226,11 +232,11 @@ assert plaintext == b"secret message"
 
 ```text
 -----BEGIN ENCRYPTED ML-KEM PRIVATE KEY-----
-<Base64 STANDARD of: magic || version || nonce || ciphertext || tag>
+<Base64 STANDARD of: magic || version || level_id || salt || nonce || ciphertext || tag>
 -----END ENCRYPTED ML-KEM PRIVATE KEY-----
 ```
 
-The internal blob format is an implementation detail — treat it as opaque. Decryption goes through `load_secret_key_pem` / `load_secret_key_raw` only.
+The internal blob format is an implementation detail — treat it as opaque. Public file-based decryption goes through `aegisq.keys.load_secret_key(path, password=...)`; callers should not import the native bridge directly.
 
 ## See Also
 

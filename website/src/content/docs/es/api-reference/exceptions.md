@@ -9,9 +9,9 @@ AegisQ define una jerarquía de excepciones que se mapean a modos de falla cript
 
 ```text
 AegisQError(Exception)                                Excepción base
-├── DecapsulationError(AegisQError)                   Error estructural de ML-KEM (tamaño de buffer incorrecto)
+├── DecapsulationError(AegisQError)                   Tipo exportado para errores estructurales de desencapsulación
 ├── DecryptionError(AegisQError)                      Falló el auth tag de AES-GCM (manipulado o clave incorrecta)
-├── InvalidParameterError(AegisQError, ValueError)    Tamaños de parámetros incorrectos
+├── InvalidParameterError(AegisQError)                Tamaños de parámetros incorrectos
 ├── KeySerializationError(AegisQError)                PEM / JSON / magic / version malformados
 ├── RngError(AegisQError)                             CSPRNG del OS no disponible
 └── SessionExpiredError(AegisQError)                  Uso de una EphemeralSession cerrada
@@ -25,7 +25,7 @@ La excepción base para todos los errores de AegisQ. Atrapala para manejar cualq
 
 ### `DecapsulationError`
 
-Se lanza cuando la capsule ML-KEM tiene un tamaño de buffer incorrecto (error estructural). **No** se lanza para contenidos inválidos de la capsule — ver la nota sobre implicit rejection más abajo.
+Se exporta para fallos estructurales de desencapsulación. El core actual informa los tamaños incorrectos de clave/capsule mediante `InvalidParameterError`, no `DecapsulationError`. Ninguna de estas excepciones se lanza solo por contenido inválido de una capsule de tamaño correcto; consulte implicit rejection más abajo.
 
 ### `DecryptionError`
 
@@ -36,11 +36,11 @@ Se lanza cuando falla la verificación del authentication tag de AES-GCM. Esto s
 
 ### `InvalidParameterError`
 
-Se lanza cuando los tamaños de los parámetros no coinciden con los valores esperados para el nivel de seguridad (por ejemplo, proporcionar una clave pública de 768 bytes cuando ML-KEM-1024 espera 1568 bytes). Hereda tanto de `AegisQError` como de `ValueError`.
+Se lanza cuando los tamaños de los parámetros no coinciden con los valores esperados para el nivel de seguridad (por ejemplo, proporcionar una clave pública de 768 bytes cuando ML-KEM-1024 espera 1568 bytes). Hereda de `AegisQError`, **no** de `ValueError`. Capture esta excepción explícitamente o capture `AegisQError`.
 
 ### `KeySerializationError`
 
-Lanzada por los helpers de persistencia basados en archivos en [`aegisq.keys`](/api-reference/key-serialization/) cuando un PEM, JSON, magic o version header está malformado o ausente. Se distingue de `DecryptionError` (que se dispara cuando la contraseña es incorrecta): `KeySerializationError` significa que la **estructura** del archivo es inválida, independientemente de la corrección de la contraseña.
+Lanzada por los helpers de persistencia basados en archivos en [`aegisq.keys`](/es/api-reference/key-serialization/) cuando un PEM, JSON, magic o version header está malformado o ausente. Se distingue de `DecryptionError` (que se dispara cuando la contraseña es incorrecta): `KeySerializationError` significa que la **estructura** del archivo es inválida, independientemente de la corrección de la contraseña.
 
 ### `RngError`
 
@@ -48,7 +48,7 @@ Se lanza cuando el CSPRNG del sistema operativo (Cryptographically Secure Pseudo
 
 ### `SessionExpiredError`
 
-Lanzada por [`EphemeralSession`](/api-reference/ephemeral-session/) cuando se llama a `encrypt()` o `decrypt()` después de que la sesión ha sido cerrada (ya sea explícitamente vía `close()` o implícitamente al salir del context manager). La clave secreta efímera ha sido descartada en ese punto, así que la operación no puede proceder.
+Lanzada por [`EphemeralSession`](/es/api-reference/ephemeral-session/) cuando se llama a `encrypt()` o `decrypt()` después de que la sesión ha sido cerrada (ya sea explícitamente vía `close()` o implícitamente al salir del context manager). La referencia al keypair ha sido descartada en ese punto, así que la operación no puede proceder.
 
 ## Ejemplo de Manejo de Errores
 
