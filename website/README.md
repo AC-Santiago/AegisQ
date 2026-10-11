@@ -118,6 +118,11 @@ HTTP 404 response. `UI_QA_DIR` can override the ignored local report directory.
 
 ## Useful Commands
 
+Cloudflare tooling is pinned in the frontend lockfile. Use
+`corepack pnpm install --frozen-lockfile` and `corepack pnpm exec wrangler --version`
+from `website/`; do not install a global or unpinned Wrangler. Installing or
+checking the CLI does not deploy anything or change the Workers Free plan.
+
 | Command              | Action                                       |
 | :------------------- | :------------------------------------------- |
 | `pnpm dev`           | Start local dev server at `localhost:4321`   |

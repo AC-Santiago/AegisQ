@@ -52,3 +52,6 @@ opencode.json
 /.github/agents/impeccable-*.agent.md
 /.github/hooks/impeccable.json
 /.github/skills/impeccable/
+
+# Local Cloudflare emulator state and dry-run output
+/website/.wrangler/
