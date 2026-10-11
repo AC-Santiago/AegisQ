@@ -1,0 +1,13 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "aegisq-docs",
+  "compatibility_date": "2026-10-11",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "docs.aegisq.dev", "custom_domain": true }],
+  "assets": {
+    "directory": "./dist/cloudflare/docs",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page"
+  }
+}

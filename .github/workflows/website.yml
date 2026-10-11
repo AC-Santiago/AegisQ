@@ -1,0 +1,53 @@
+name: Website
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths: ['website/**', '.github/workflows/website.yml']
+  push:
+    branches: [main, develop]
+    paths: ['website/**', '.github/workflows/website.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Static hosting verification
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Enable pinned package manager
+        run: |
+          npm install --global corepack@0.34.6
+          corepack enable
+      - run: corepack pnpm install --frozen-lockfile
+      - run: corepack pnpm astro check
+      - run: corepack pnpm build:cloudflare
+      - run: node scripts/test-cloudflare.mjs
+      - name: Validate both static-only deployment configurations
+        run: |
+          corepack pnpm exec wrangler deploy --config wrangler.home.json --dry-run --outdir .wrangler/dry-home
+          corepack pnpm exec wrangler deploy --config wrangler.docs.json --dry-run --outdir .wrangler/dry-docs
+      - name: Provision isolated browser tooling
+        run: |
+          npm install --prefix "$RUNNER_TEMP/hosting-browser" --no-package-lock --ignore-scripts playwright@1.63.0
+          node "$RUNNER_TEMP/hosting-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Verify emulator routing and native cross-host interactions
+        env:
+          HOSTING_BROWSER: '1'
+        run: |
+          PLAYWRIGHT_MODULE="$RUNNER_TEMP/hosting-browser/node_modules/playwright/index.mjs" node scripts/verify-cloudflare-runtime.mjs
