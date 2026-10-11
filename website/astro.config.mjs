@@ -1,21 +1,29 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import { channel, currentChannel, remarkChannelLinks } from './src/docs-channels.mjs';
 
 // https://astro.build/config
 export default defineConfig({
 	// The packaging step assigns the two splash pages to the apex domain.
 	site: 'https://docs.aegisq.dev',
+	base: currentChannel.base,
+	trailingSlash: 'always',
+	outDir: channel === 'next' ? './dist-next' : './dist',
+	cacheDir: `./node_modules/.astro-${channel}`,
+	markdown: { remarkPlugins: [remarkChannelLinks] },
 	integrations: [
 		starlight({
 			title: 'AegisQ',
 			disable404Route: true,
+			head: channel === 'next' ? [{ tag: 'meta', attrs: { name: 'robots', content: 'noindex, follow' } }] : [],
 			customCss: ['./src/styles/docs.css'],
 			components: {
 				Header: './src/components/DocsHeader.astro',
 				Hero: './src/components/LandingHero.astro',
 				SiteTitle: './src/components/DocsTitle.astro',
 				MobileMenuToggle: './src/components/AccessibleMenu.astro',
+				PageTitle: './src/components/VersionedPageTitle.astro',
 			},
 			expressiveCode: {
 				styleOverrides: { borderRadius: '0.375rem' },
