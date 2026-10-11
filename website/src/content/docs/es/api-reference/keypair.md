@@ -7,7 +7,7 @@ sidebar:
     variant: tip
 ---
 
-La clase `KeyPair` encapsula un par de claves ML-KEM devuelto por [`AegisCipher.generate_keypair()`](/api-reference/aegiscipher/#generate_keypair) y [`MlKem.generate_keypair()`](/api-reference/mlkem/#generate_keypair). Expone el material público/secreto en crudo como `bytes` y métodos de conveniencia para serializarlos en formatos aptos para transporte.
+La clase `KeyPair` encapsula un par de claves ML-KEM devuelto por [`AegisCipher.generate_keypair()`](/es/api-reference/aegiscipher/#generate_keypair) y [`MlKem.generate_keypair()`](/es/api-reference/mlkem/#generate_keypair). Expone el material público/secreto en crudo como `bytes` y métodos de conveniencia para serializarlos en formatos aptos para transporte.
 
 ## Firma de la Clase
 
@@ -40,7 +40,7 @@ La clave pública ML-KEM como `bytes`. Compartila abiertamente.
 
 ### `secret_key`
 
-La clave secreta ML-KEM como `bytes`. **Nunca la compartas.** Se zeroiza vía `zeroize::Zeroize` de Rust cuando el `KeyPair` se elimina y el GIL se libera durante cada operación criptográfica que la toca.
+La clave secreta ML-KEM como `bytes`. **No la comparta ni la registre.** El getter crea una copia inmutable Python. El `KeyPair` expuesto a Python no zeroiza actualmente su buffer secreto Rust al destruirse, y eliminar un objeto `bytes` no garantiza su borrado. Consulte el [modelo de seguridad](/es/internals/security-model/).
 
 | Nivel | Tamaño |
 |-------|--------|
@@ -54,20 +54,20 @@ El `SecurityLevel` con el que se generó el keypair.
 
 ### `__repr__` (v1.4.0 — fingerprint seguro)
 
-El repr intencionalmente **no filtra** bytes crudos ni tamaños de clave (los tamaños solos permitían ataques de correlación entre instancias). Retorna:
+El repr omite los bytes de las claves y las longitudes explícitas de los buffers. Incluye el nivel (que determina los tamaños) y un fingerprint público. Ejemplo para ML-KEM-768:
 
 ```text
-KeyPair(level=<SecurityLevel.ML_KEM_768>, fp=<16-hex>)
+KeyPair(level=MlKem768, fp=<16-hex>)
 ```
 
-Donde `<16-hex>` son los primeros 8 bytes de `SHA3-256(public_key)` en hexadecimal — un fingerprint estable y no reversible, útil para logs.
+`<16-hex>` son los primeros 8 bytes de `SHA3-256(public_key)` en hexadecimal. Es un identificador truncado estable, no una prueba de identidad; permite correlacionar el uso de la misma clave pública entre logs.
 
 ```python
 >>> from aegisq import AegisCipher
 >>> cipher = AegisCipher()
 >>> kp = cipher.generate_keypair()
 >>> repr(kp)
-"KeyPair(level=<SecurityLevel.ML_KEM_768>, fp=a3f1c0b27d4e9f12)"
+"KeyPair(level=MlKem768, fp=a3f1c0b27d4e9f12)"  # Fingerprint ilustrativo
 ```
 
 ## Métodos de Serialización de la Clave Pública
@@ -100,24 +100,26 @@ Retorna la clave pública como un **sobre PEM-like**:
 -----END ML-KEM PUBLIC KEY-----
 ```
 
-El cuerpo usa Base64 STANDARD (no URL-safe). El nivel **no está codificado** en el PEM — el llamador debe saber para qué `SecurityLevel` se generó ese PEM. Usá [`load_public_key(path, level=...)`](/api-reference/key-serialization/#load_public_key) cuando lo leas de vuelta.
+El cuerpo usa Base64 STANDARD (no URL-safe). El nivel **no está codificado** en el PEM — el llamador debe saber para qué `SecurityLevel` se generó ese PEM. Use [`load_public_key(path, level=...)`](/es/api-reference/key-serialization/#load_public_key) cuando lo lea de vuelta.
 
 ### `public_key_json() -> str`
 
-Retorna la clave pública como **JSON auto-descriptivo** con los campos `algorithm`, `level`, y `public_key` (Base64 STANDARD). Usalo cuando quieras un formato que registre su propio nivel — útil para archivo e interoperabilidad con clientes no-Python.
+Retorna la clave pública como **JSON auto-descriptivo** con campos `algorithm`, `level` y `public_key` (**Base64 URL-safe sin padding**). El nivel usa el nombre del enum Python, como `ML_KEM_768`.
 
 ```json
 {
   "algorithm": "ML-KEM",
-  "level": "ML-KEM-768",
+  "level": "ML_KEM_768",
   "public_key": "6BDM8h...snip..."
 }
 ```
 
 ## Métodos de Exportación de la Clave Secreta
 
-:::caution[Las claves secretas NUNCA se exportan en texto plano]
-La clave secreta se cifra con **AES-256-GCM** usando una clave derivada de tu `password` vía **HKDF-SHA3-256**. Perder la contraseña significa perder la clave — no hay mecanismo de recuperación. Intencionalmente no hay API para exportar la clave secreta sin contraseña.
+:::caution[Los helpers cifran; el acceso crudo sigue disponible]
+`export_secret_key_raw()` y `export_secret_key_pem()` cifran con **AES-256-GCM** mediante una clave derivada de `password` con **HKDF-SHA3-256**. Perder esa entrada impide recuperar la exportación cifrada. La propiedad `secret_key` sigue exponiendo bytes en texto plano.
+
+HKDF no es una función de endurecimiento de contraseñas y no ralentiza ataques offline como Argon2 o scrypt. Use bytes secretos de alta entropía de un gestor de secretos o CSPRNG, no una contraseña humana débil. Proteja y conserve ese secreto por separado.
 :::
 
 ### `export_secret_key_raw(password: bytes) -> bytes`
@@ -134,7 +136,7 @@ Retorna la clave secreta cifrada como **sobre PEM-like**:
 -----END ENCRYPTED ML-KEM PRIVATE KEY-----
 ```
 
-El cuerpo usa Base64 STANDARD. Usá [`load_secret_key(path, password=...)`](/api-reference/key-serialization/#load_secret_key) o [`MlKem`](/api-reference/mlkem/) para descifrar.
+El cuerpo usa Base64 STANDARD. Use [`load_secret_key(path, password=...)`](/es/api-reference/key-serialization/#load_secret_key) para descifrar.
 
 ## Ejemplo Completo
 
@@ -154,18 +156,19 @@ pem_string: str = keypair.public_key_pem()      # para archivos (.pem)
 json_string: str = keypair.public_key_json()    # para archivo / interop
 
 # Exportación cifrada de la clave secreta
-password: bytes = b"correct horse battery staple"
+import secrets
+password: bytes = secrets.token_bytes(32)  # Conservar de forma segura para recuperarla
 sk_pem: str = keypair.export_secret_key_pem(password)
 sk_blob: bytes = keypair.export_secret_key_raw(password)
 
-# Seguro de loguear: solo el nivel + fingerprint
+# Solo nivel y fingerprint público; considerar correlación entre logs
 print(repr(keypair))
-# KeyPair(level=<SecurityLevel.ML_KEM_768>, fp=a3f1c0b27d4e9f12)
+# KeyPair(level=MlKem768, fp=a3f1c0b27d4e9f12)
 ```
 
 ## Ver También
 
-- [`AegisCipher.generate_keypair()`](/api-reference/aegiscipher/#generate_keypair) — cómo obtener un `KeyPair`
-- [`MlKem.generate_keypair()`](/api-reference/mlkem/#generate_keypair) — lo mismo, vía la API de bajo nivel
-- [Helpers de Serialización de Claves](/api-reference/key-serialization/) — `save_*` / `load_*` para persistencia basada en archivos
-- [EphemeralSession](/api-reference/ephemeral-session/) — keypair auto-gestionado con forward secrecy
+- [`AegisCipher.generate_keypair()`](/es/api-reference/aegiscipher/#generate_keypair) — cómo obtener un `KeyPair`
+- [`MlKem.generate_keypair()`](/es/api-reference/mlkem/#generate_keypair) — lo mismo, vía la API de bajo nivel
+- [Helpers de Serialización de Claves](/es/api-reference/key-serialization/) — `save_*` / `load_*` para persistencia basada en archivos
+- [EphemeralSession](/es/api-reference/ephemeral-session/) — keypair de sesión auto-gestionado y límites de ciclo de vida

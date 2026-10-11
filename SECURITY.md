@@ -8,6 +8,11 @@
 | 1.1.x | ✅ Activo |
 | 1.0.x | ✅ Mantenimiento (parches de seguridad únicamente) |
 
+Esta tabla conserva la política publicada para las ramas anteriores; no define
+el soporte de las versiones posteriores a 1.2.x. La matriz debe actualizarse
+mediante una decisión explícita de mantenimiento. Consulte `CHANGELOG.md` y
+los metadatos de PyPI para identificar releases, no para inferir su soporte.
+
 ## Reporte de vulnerabilidades
 
 **Por favor, no reportes vulnerabilidades de seguridad como Issues públicos de GitHub.**
@@ -70,19 +75,30 @@ Los investigadores que reporten vulnerabilidades válidas serán reconocidos en 
 - **Anonimato o privacidad de metadatos**: AegisQ no oculta quién se comunica con quién.
 - **Autenticación de identidad**: ML-KEM es un KEM, no un esquema de firma.
   Para autenticación de origen usa un esquema de firma post-cuántica (ej: ML-DSA / FIPS 204).
+- **Forward secrecy o borrado completo de secretos**: `EphemeralSession.close()`
+  descarta la referencia al keypair, pero no garantiza la zeroización de todas
+  sus copias Rust/Python. El context manager de `AegisCipher` solo sobrescribe
+  buffers mutables registrados mediante su hook privado.
+- **Protección contra replay**: debe implementarse en el protocolo de la aplicación.
 
 ### Dependencias criptográficas (Rust)
 
-| Crate | Propósito | Auditoría |
+| Crate | Propósito | Alcance |
 |---|---|---|
-| `aegisq-core` (in-tree) | ML-KEM FIPS 203 — implementación propia, sin crate externo `ml-kem` | N/A (in-tree) |
-| `aes-gcm` | AES-256-GCM FIPS 197 | RustCrypto — auditado |
-| `zeroize` | Zeroización de memoria sensible | RustCrypto — auditado |
-| `getrandom` | CSPRNG del sistema operativo | RustCrypto — auditado |
+| `aegisq-core` (in-tree) | Implementación propia de ML-KEM según FIPS 203 | No se presenta una auditoría independiente de AegisQ |
+| `aes-gcm` | AES-256-GCM según NIST SP 800-38D; AES según FIPS 197 | RustCrypto; una auditoría upstream no certifica esta integración |
+| `zeroize` | Sobrescritura de buffers sensibles seleccionados | No cubre automáticamente todas las copias Rust/Python |
+| `getrandom` | Aleatoriedad del sistema operativo | Los errores del SO deben propagarse |
 
 ### Nivel de madurez
 
-AegisQ es un proyecto en estado **Beta (v1.2.0)**. La implementación criptográfica
-es FIPS 203 compliant y ha pasado los vectores KAT de NIST. Se han realizado revisiones
-de seguridad internas del código Rust y los bindings FFI. Se recomienda auditoría
-independiente antes de uso en sistemas de alto riesgo.
+AegisQ declara estado **Beta** en `pyproject.toml`. Implementa ML-KEM según FIPS 203
+y contiene tests con vectores NIST ACVP: el runner Python compara resultados
+esperados de KeyGen y encapsulación; otros tests comprueban roundtrips y rechazo
+implícito. La presencia de tests no acredita el resultado de una ejecución actual,
+una validación ACVP oficial ni una certificación FIPS 140 de AegisQ.
+
+No se presenta aquí evidencia de una auditoría independiente de la implementación
+completa. Se recomienda realizarla antes del uso en sistemas de alto riesgo.
+Los mecanismos y límites se detallan en el
+[modelo de seguridad](website/src/content/docs/es/internals/security-model.md).

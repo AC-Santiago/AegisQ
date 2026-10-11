@@ -1,11 +1,15 @@
 ---
 title: EphemeralSession
-description: Forward secrecy via auto-generated keypairs
+description: Auto-generated session keypairs, closure behavior, and cleanup limitations.
 ---
 
 ## Overview
 
-`EphemeralSession` provides forward secrecy by generating a keypair internally and destroying the secret key when the session closes.
+`EphemeralSession` generates a keypair internally, exposes its public key, and uses the private key for decryption. Closing the session marks it closed and drops its keypair reference.
+
+:::caution[No secure-erasure or forward-secrecy guarantee]
+`close()` does not guarantee that every Rust/Python copy of the secret is erased. Forward secrecy requires an appropriate authenticated protocol and secure disposal of past keys; the session helper alone does not provide it. See [Security Model](/internals/security-model/).
+:::
 
 ```python
 from aegisq import EphemeralSession
@@ -13,7 +17,7 @@ from aegisq import EphemeralSession
 with EphemeralSession() as session:
     package = session.encrypt(b"Secret data", session.public_key)
     plaintext = session.decrypt(package)
-# Secret key destroyed on exit
+# Session closed and keypair reference dropped on exit
 ```
 
 ## API Reference
@@ -28,7 +32,7 @@ def __init__(self, level: SecurityLevel = SecurityLevel.ML_KEM_768) -> None
 
 ### `public_key` {#public_key}
 
-Read-only public key. The secret key is never exposed.
+Read-only public key. There is no public secret-key getter; this is API encapsulation, not protection from code or memory inspection within the process. Access after close raises `SessionExpiredError`.
 
 ```python
 session = EphemeralSession()
@@ -59,7 +63,7 @@ Decrypts a transit package using the ephemeral secret key.
 def close(self) -> None
 ```
 
-Closes the session and destroys the secret key. Safe to call multiple times.
+Marks the session closed and drops its keypair reference. Safe to call multiple times. Subsequent `public_key`, `encrypt()`, and `decrypt()` calls raise `SessionExpiredError`; `level` remains readable.
 
 ## Context Manager
 
@@ -69,5 +73,5 @@ Closes the session and destroys the secret key. Safe to call multiple times.
 with EphemeralSession() as session:
     package = session.encrypt(b"Secret data", session.public_key)
     plaintext = session.decrypt(package)
-# Secret key automatically destroyed on exit
+# Session automatically closed on exit; no complete erasure guarantee
 ```
