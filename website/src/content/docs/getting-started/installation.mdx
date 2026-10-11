@@ -24,13 +24,13 @@ pip install aegisq-pqc
 
 **Requirements:**
 - Python ≥ 3.11
-- No Rust toolchain needed — the PyPI package includes pre-compiled native extensions
+- No Rust toolchain needed when a wheel is available for your platform; otherwise installation builds from source
 
-AegisQ uses the PyO3 **abi3 stable ABI**, which means a single wheel works across Python 3.11, 3.12, 3.13, and future versions without recompilation.
+AegisQ targets PyO3's **abi3-py311 stable ABI**. Wheels are still OS/architecture-specific; ABI compatibility does not establish testing on every future Python version or free-threaded build.
 
 ## From Source (requires Rust toolchain)
 
-If you want to build from source (e.g., for development or auditing):
+If you want to build from source (e.g., for development or auditing), follow either workflow below. `uv sync --dev` may refresh `uv.lock` to match the checkout; `--locked` is only appropriate when the lockfile is already synchronized with the project version and dependencies.
 
 
 <Tabs syncKey="installation">
@@ -38,20 +38,22 @@ If you want to build from source (e.g., for development or auditing):
 ```bash
 # Clone and build
 git clone https://github.com/AC-Santiago/AegisQ.git
-cd aegisq
+cd AegisQ
 
-uv sync --locked
+uv sync --dev
 
-maturin develop --release
+uv run maturin develop --release
 ```
 </TabItem>
 <TabItem label="pip">
 ```bash
 # Clone and build
 git clone https://github.com/AC-Santiago/AegisQ.git
-cd aegisq
+cd AegisQ
 
-pip install maturin
+python -m venv .venv
+source .venv/bin/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install maturin
 
 maturin develop --release
 ```
@@ -66,7 +68,7 @@ maturin develop --release
 For development and testing, you can use a debug build which compiles faster:
 
 ```bash
-maturin develop
+uv run maturin develop
 ```
 
 ## System Requirements
@@ -78,5 +80,5 @@ maturin develop
 | OS | Linux, macOS, Windows |
 
 :::note
-AegisQ's native extension is built with PyO3's `abi3-py311` flag, targeting the Python Stable ABI. This ensures binary compatibility from Python 3.11 onwards without requiring per-version compilation.
+AegisQ's native extension targets the Python Stable ABI with `abi3-py311`. With the pip workflow, run `maturin develop` inside the activated virtual environment instead of `uv run maturin develop`. Source builds use the version declared by the checkout, which may be a prerelease.
 :::

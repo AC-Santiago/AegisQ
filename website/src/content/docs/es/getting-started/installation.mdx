@@ -24,13 +24,13 @@ pip install aegisq-pqc
 
 **Requisitos:**
 - Python ≥ 3.11
-- No necesitás toolchain de Rust — el paquete de PyPI incluye extensiones nativas ya compiladas
+- No requiere Rust si existe un wheel para su plataforma; en caso contrario se compila desde el código fuente
 
-AegisQ usa el **ABI estable** de PyO3 (`abi3`), lo que significa que un único wheel funciona en Python 3.11, 3.12, 3.13 y versiones futuras sin necesidad de recompilar.
+AegisQ usa el **ABI estable abi3-py311** de PyO3. Los wheels siguen siendo específicos de SO/arquitectura; la compatibilidad ABI no demuestra que cada versión futura de Python o build free-threaded haya sido probada.
 
 ## Desde el Código Fuente (requiere toolchain de Rust)
 
-Si querés compilar desde el código fuente (por ejemplo, para desarrollo o auditoría):
+Para compilar desde el código fuente (por ejemplo, para desarrollo o auditoría), use uno de estos flujos. `uv sync --dev` puede actualizar `uv.lock` para coincidir con el checkout; `--locked` solo corresponde si el lockfile está sincronizado con la versión y las dependencias del proyecto.
 
 
 <Tabs syncKey="installation">
@@ -38,20 +38,22 @@ Si querés compilar desde el código fuente (por ejemplo, para desarrollo o audi
 ```bash
 # Clonar y compilar
 git clone https://github.com/AC-Santiago/AegisQ.git
-cd aegisq
+cd AegisQ
 
-uv sync --locked
+uv sync --dev
 
-maturin develop --release
+uv run maturin develop --release
 ```
 </TabItem>
 <TabItem label="pip">
 ```bash
 # Clonar y compilar
 git clone https://github.com/AC-Santiago/AegisQ.git
-cd aegisq
+cd AegisQ
 
-pip install maturin
+python -m venv .venv
+source .venv/bin/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install maturin
 
 maturin develop --release
 ```
@@ -66,7 +68,7 @@ maturin develop --release
 Para desarrollo y testing, podés usar un build debug que compila más rápido:
 
 ```bash
-maturin develop
+uv run maturin develop
 ```
 
 ## Requisitos del Sistema
@@ -78,5 +80,5 @@ maturin develop
 | SO | Linux, macOS, Windows |
 
 :::note
-La extensión nativa de AegisQ está compilada con el flag `abi3-py311` de PyO3, que apunta al ABI estable de Python. Esto garantiza compatibilidad binaria desde Python 3.11 en adelante sin requerir compilación por versión.
+La extensión apunta al ABI estable de Python con `abi3-py311`. En el flujo pip, ejecute `maturin develop` dentro del entorno virtual activado, en lugar de `uv run maturin develop`. Los builds desde fuente usan la versión del checkout, que puede ser una prerelease.
 :::
