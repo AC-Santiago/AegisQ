@@ -55,6 +55,46 @@ website/
 
 Documentation lives in `src/content/docs/` as `.md` or `.mdx` files. Starlight automatically generates routes from the file structure, matching the sidebar defined in `astro.config.mjs`.
 
+## Documentation channels
+
+The version selector offers only the latest stable release and development,
+in English and Spanish. There are no historical documentation archives.
+
+| Channel | Source | Public paths |
+| --- | --- | --- |
+| Stable | Reviewed stable-compatible `src/content/docs/` pages | Existing paths, including `/es/` |
+| Development | Same baseline with `_next/` page overrides | `/next/`, including `/next/es/` |
+
+`src/docs-channels.mjs` records the published stable version/tag and development
+version/branch. A checkout prerelease is **not** proof of a published stable
+release. Update stable metadata only after verifying the actual PyPI release;
+update both stable installation examples and EN/ES content together. The build
+checks the development label against `pyproject.toml`; it does not publish a
+package or automatically query PyPI.
+
+Stable pages may receive documentation corrections without importing development
+API changes. For development-only changes, add a full replacement page at
+`src/content/docs/_next/<same-path>` and its `es/` counterpart. Unchanged pages
+inherit the stable baseline; this avoids duplicate maintained copies of identical
+contracts. The initial shared baseline was checked against `v1.5.0`: Python/Rust
+runtime sources match the development checkout, apart from version metadata.
+Adding a new override file requires restarting the local dev server.
+
+`pnpm build` builds both channels with separate Astro caches and Pagefind indexes,
+then assembles them under `dist/`. Preview that output to test channel switching.
+`pnpm dev` shows stable; `AEGISQ_DOCS_CHANNEL=next pnpm dev` shows development at
+`/next/`. Internal prose links, native sidebar, language/theme selectors and
+search stay in the chosen channel. The version selector retains page, language
+and fragment; fallback links are available without JavaScript. Both channels
+recover the existing localized homepage, not a duplicate development homepage.
+
+Development pages carry a prerelease notice and `noindex, follow`, and are omitted
+from the production sitemap. Their own Pagefind index remains searchable.
+`scripts/test-doc-channels.mjs` checks page pairs, selector destinations,
+installation overrides, SEO and version metadata after packaging. The hosting
+browser checks exercise channel round trips, isolated search and native locale
+controls. Publication remains manual with separate approval.
+
 ## Frontend design and verification
 
 The paper/forest frame keeps Starlight's search, language selector, theme
@@ -140,7 +180,7 @@ corepack pnpm exec wrangler deploy --config wrangler.docs.json --dry-run --outdi
 
 These checks make no Cloudflare changes. The generated `dist/cloudflare/home`
 serves only the English/Spanish homes at `aegisq.dev`; `dist/cloudflare/docs`
-serves 36 documentation pages at `docs.aegisq.dev`. Both carry local fonts,
+serves 36 stable and 36 development pages at `docs.aegisq.dev`. Both carry local fonts,
 scripts and the bilingual Pagefind index. Home search results use legacy-path
 redirects to the documentation host; no cross-origin search fetch is required.
 The packaging step rewrites navigation, locale options and SEO attributes,

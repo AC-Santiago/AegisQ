@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro build",
-    "build:cloudflare": "astro build && node scripts/prepare-cloudflare.mjs && node scripts/verify-cloudflare.mjs",
+    "build": "node scripts/build-channels.mjs",
+    "build:cloudflare": "node scripts/build-channels.mjs && node scripts/prepare-cloudflare.mjs && node scripts/verify-cloudflare.mjs && node scripts/test-doc-channels.mjs",
     "verify:cloudflare": "node scripts/verify-cloudflare.mjs",
     "verify:hosting": "node scripts/verify-cloudflare-runtime.mjs",
     "preview": "astro preview",
