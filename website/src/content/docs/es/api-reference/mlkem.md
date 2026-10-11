@@ -3,7 +3,7 @@ title: MlKem
 description: API ML-KEM de bajo nivel para operaciones crudas de encapsulación y desencapsulación de claves.
 ---
 
-`MlKem` expone las operaciones ML-KEM crudas (FIPS 203) para usuarios avanzados que construyen protocolos custom. Si solo necesitás cifrar y descifrar datos, usá [`AegisCipher`](/api-reference/aegiscipher/) en su lugar.
+`MlKem` expone las operaciones ML-KEM crudas (FIPS 203) para usuarios avanzados que construyen protocolos custom. Si solo necesita cifrar y descifrar datos, use [`AegisCipher`](/es/api-reference/aegiscipher/) en su lugar.
 
 ## Firma de la Clase
 
@@ -64,7 +64,7 @@ Realiza la desencapsulación ML-KEM: recupera el shared secret de 32 bytes desde
 **Retorna:** `bytes` — El shared secret de 32 bytes
 
 :::caution[Implicit Rejection]
-`decapsulate()` **nunca lanza un error** por capsules inválidas. En su lugar, retorna una clave pseudoaleatoria (derivada del seed de rechazo `z` de la clave secreta). Este es el mecanismo de **implicit rejection** definido en FIPS 203 Algorithm 17 — previene ataques CCA2 vía queries de oracle.
+`decapsulate()` no lanza un error de validez por **contenido inválido de una capsule de tamaño correcto**. Devuelve `J(z || c)`, una clave pseudoaleatoria derivada con SHAKE256. Los tamaños incorrectos de clave o capsule lanzan `InvalidParameterError`. Así se distingue **implicit rejection** (FIPS 203 Algorithm 17) de la validación estructural.
 
 Si estás usando `MlKem` directamente, debés manejar este comportamiento vos mismo. `AegisCipher` lo maneja automáticamente: una capsule inválida produce una clave incorrecta para AES-GCM, lo que causa `DecryptionError` en la verificación del tag.
 :::
@@ -114,5 +114,6 @@ capsule, shared_secret = kem.encapsulate(keypair.public_key)
 
 # Desencapsular: recupera el mismo shared secret de 32 bytes
 recovered = kem.decapsulate(capsule, keypair.secret_key)
-assert shared_secret == recovered
+import hmac
+assert hmac.compare_digest(shared_secret, recovered)
 ```

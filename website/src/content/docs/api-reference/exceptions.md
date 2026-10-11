@@ -9,9 +9,9 @@ AegisQ defines a hierarchy of exceptions that map to specific cryptographic fail
 
 ```text
 AegisQError(Exception)                                Base exception
-├── DecapsulationError(AegisQError)                   ML-KEM structural error (wrong buffer size)
+├── DecapsulationError(AegisQError)                   Exported structural decapsulation error type
 ├── DecryptionError(AegisQError)                      AES-GCM auth tag failed (tampered or wrong key)
-├── InvalidParameterError(AegisQError, ValueError)    Incorrect parameter sizes
+├── InvalidParameterError(AegisQError)                Incorrect parameter sizes
 ├── KeySerializationError(AegisQError)                Malformed PEM / JSON / magic / version
 ├── RngError(AegisQError)                             OS CSPRNG unavailable
 └── SessionExpiredError(AegisQError)                  Use of a closed EphemeralSession
@@ -25,7 +25,7 @@ The base exception for all AegisQ errors. Catch this to handle any AegisQ-specif
 
 ### `DecapsulationError`
 
-Raised when the ML-KEM capsule has an incorrect buffer size (structural error). This is **not** raised for invalid capsule contents — see the note on implicit rejection below.
+Exported for structural decapsulation failures. The current core reports incorrect key/capsule sizes as `InvalidParameterError`, not `DecapsulationError`. Neither exception is raised solely for invalid contents of a correctly sized capsule — see implicit rejection below.
 
 ### `DecryptionError`
 
@@ -36,7 +36,7 @@ Raised when AES-GCM authentication tag verification fails. This means either:
 
 ### `InvalidParameterError`
 
-Raised when parameter sizes don't match the expected values for the security level (e.g., providing a 768-byte public key when ML-KEM-1024 expects 1568 bytes). Inherits from both `AegisQError` and `ValueError`.
+Raised when parameter sizes don't match the expected values for the security level (e.g., providing a 768-byte public key when ML-KEM-1024 expects 1568 bytes). Inherits from `AegisQError`, **not** `ValueError`. Catch it explicitly or catch `AegisQError`.
 
 ### `KeySerializationError`
 
