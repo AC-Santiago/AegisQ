@@ -4,9 +4,8 @@ import starlight from '@astrojs/starlight';
 
 // https://astro.build/config
 export default defineConfig({
-	// Set a site URL so integrations like @astrojs/sitemap can be enabled later.
-	// Update this when AegisQ ships a public docs site (e.g. https://aegisq.dev).
-	site: 'https://aegisq-pqc.readthedocs.io',
+	// The packaging step assigns the two splash pages to the apex domain.
+	site: 'https://docs.aegisq.dev',
 	integrations: [
 		starlight({
 			title: 'AegisQ',

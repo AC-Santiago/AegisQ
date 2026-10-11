@@ -116,12 +116,41 @@ Run `website/scripts/verify-404.mjs` for the error-page matrix, native locale/th
 switching, home recovery, noindex and the production preview's unknown-route
 HTTP 404 response. `UI_QA_DIR` can override the ignored local report directory.
 
-## Useful Commands
+## Split-domain production bundles
+
+Run these commands from `website/`:
+
+```bash
+corepack pnpm install --frozen-lockfile
+corepack pnpm astro check
+corepack pnpm build:cloudflare
+corepack pnpm exec wrangler deploy --config wrangler.home.json --dry-run --outdir .wrangler/dry-home
+corepack pnpm exec wrangler deploy --config wrangler.docs.json --dry-run --outdir .wrangler/dry-docs
+```
+
+These checks make no Cloudflare changes. The generated `dist/cloudflare/home`
+serves only the English/Spanish homes at `aegisq.dev`; `dist/cloudflare/docs`
+serves 36 documentation pages at `docs.aegisq.dev`. Both carry local fonts,
+scripts and the bilingual Pagefind index. Home search results use legacy-path
+redirects to the documentation host; no cross-origin search fetch is required.
+The packaging step rewrites navigation, locale options and SEO attributes,
+not examples or application scripts, and produces host-specific sitemaps/robots.
+Docs roots temporarily redirect to localized installation pages. Unknown routes
+use the nearest English/Spanish `404.html` with HTTP 404, not SPA fallback.
+
+Only static assets are configured: no Worker script, bindings, SSR or paid
+resources. The verifier rejects unexpected config fields and checks Workers
+Free limits (20,000 files and 25 MiB per asset). It does not inspect account
+billing; confirm Workers Free before a separately approved production deployment.
+Removing the packaging scripts/configs and restoring the prior site URL/scripts
+rolls back this build-only unit without changing library code or existing DNS.
 
 Cloudflare tooling is pinned in the frontend lockfile. Use
 `corepack pnpm install --frozen-lockfile` and `corepack pnpm exec wrangler --version`
 from `website/`; do not install a global or unpinned Wrangler. Installing or
 checking the CLI does not deploy anything or change the Workers Free plan.
+
+## Useful Commands
 
 | Command              | Action                                       |
 | :------------------- | :------------------------------------------- |
