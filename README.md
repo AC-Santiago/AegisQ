@@ -6,6 +6,8 @@ AegisQ is a hybrid cryptographic library that combines **ML-KEM** (FIPS 203) for
 
 **Status: Beta.** See [PyPI](https://pypi.org/project/aegisq-pqc/) for published versions and [CHANGELOG.md](CHANGELOG.md) for release history. Checkout versions are declared in the package manifests; `develop` can contain an unpublished prerelease. Algorithm implementation and test-vector coverage do not constitute FIPS certification or an independent security audit.
 
+**Website:** [aegisq.dev](https://aegisq.dev/) · **Documentation:** [English](https://docs.aegisq.dev/) / [Español](https://docs.aegisq.dev/es/)
+
 ```python
 from aegisq import AegisCipher, SecurityLevel
 
@@ -364,4 +366,11 @@ The table summarizes current manifest requirements, not exact resolved versions 
 
 ---
 
-Canonical public documentation is maintained in [website/src/content/docs/](website/src/content/docs/) in English and Spanish. Start with [installation](website/src/content/docs/getting-started/installation.mdx), the [API reference](website/src/content/docs/api-reference/aegiscipher.md), and the [security model](website/src/content/docs/internals/security-model.md). [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) is retained as historical documentation, not the current API reference.
+## Documentation
+
+Start with [installation](https://docs.aegisq.dev/getting-started/installation/),
+the [API reference](https://docs.aegisq.dev/api-reference/aegiscipher/), and the
+[security model](https://docs.aegisq.dev/internals/security-model/).
+Canonical English/Spanish sources are in
+[website/src/content/docs/](website/src/content/docs/); contributor checks and the
+manual publication procedure are in [website/README.md](website/README.md).

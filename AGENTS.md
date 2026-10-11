@@ -1,855 +1,255 @@
-# AGENTS.md — AegisQ: Motor de Criptografía Post-Cuántica
+# AGENTS.md — Guía de mantenimiento de AegisQ
 
-> **⚠️ LEE ESTE ARCHIVO COMPLETO ANTES DE GENERAR CUALQUIER CÓDIGO.**
-> Este documento es la fuente de verdad del proyecto. Cualquier decisión que contradiga
-> lo aquí escrito es incorrecta, sin importar cuánto "sentido" parezca tener en el momento.
->
-> **Estado del Proyecto:** 29/29 fases completadas — v1.2.0 listo para release
+Lee esta guía completa antes de generar código. Conserva las reglas de
+arquitectura, seguridad y entrega; no es un registro de fases completadas.
 
----
+## 1. Fuentes de verdad
 
-## Skills Index
+- [README.md](README.md): entrada al proyecto y ejemplos básicos.
+- [Documentación pública](https://docs.aegisq.dev/): guías y referencia bilingües.
+  Su fuente canónica es [website/src/content/docs/](website/src/content/docs/).
+- [CHANGELOG.md](CHANGELOG.md): historial de releases; no duplicarlo en las guías.
+- [SECURITY.md](SECURITY.md): reporte privado y compromisos de soporte.
+- `pyproject.toml` y los manifiestos de ambos crates: versión del checkout.
+  PyPI identifica las versiones publicadas; no inferirlas desde una rama.
+- `Cargo.toml`, manifiestos de crates y lockfiles: dependencias y configuración
+  vigentes. No copiar inventarios antiguos como valores canónicos.
+- [website/README.md](website/README.md): desarrollo, verificaciones y publicación.
+- [PRODUCT.md](PRODUCT.md) y [DESIGN.md](DESIGN.md): contrato de producto y diseño.
 
-Skills instalados **localmente** en `.agents/skills/` (fuente de verdad del proyecto):
+AegisQ declara estado Beta. La implementación de algoritmos estandarizados y
+los tests no equivalen a certificación FIPS, validación ACVP oficial o auditoría
+independiente. No inventar garantías, cifras de rendimiento ni soporte de versiones.
 
-| Prioridad | Contexto | Skill | Uso | Path |
-|----------|----------|-------|-----|------|
-| Alta | Rust safety / FFI | `unsafe-checker` | unsafe, raw pointers, extern, UB, bindgen, SAFETY | `.agents/skills/unsafe-checker/SKILL.md` |
-| Alta | Rust core | `rust-engineer` | ownership, borrowing, lifetimes, async, clippy | `.agents/skills/rust-engineer/SKILL.md` |
-| Alta | Rust ↔ Python FFI | `rust-ffi` | bindgen, cbindgen, safe wrappers, extern "C" | `.agents/skills/rust-ffi/SKILL.md` |
-| Media | Seguridad | `security-auditor` | threat modeling, crypto review, DevSecOps | `.agents/skills/security-auditor/SKILL.md` |
-| Alta | Python testing (recomendado) | `python-testing-patterns` | pytest, fixtures, mocking, async tests, TDD | `.agents/skills/python-testing-patterns/SKILL.md` |
-| Baja | Python testing (fallback) | `python-testing` | pytest/TDD liviano, casos simples | `.agents/skills/python-testing/SKILL.md` |
+## 2. Skills locales
 
-> Preferí `python-testing-patterns` para trabajo nuevo; `python-testing` queda como fallback liviano.
+Consultar [.agents/skills/index.md](.agents/skills/index.md) antes del trabajo
+especializado. Las skills están en `.agents/skills/`, con scope de proyecto.
 
-### Agregar nuevos skills
+| Contexto | Skill |
+| --- | --- |
+| Rust core, ownership, clippy | `rust-engineer` |
+| Unsafe, punteros, ABI, FFI | `unsafe-checker` + `rust-ffi` |
+| Seguridad y revisión criptográfica | `security-auditor` |
+| Tests Python nuevos | `python-testing-patterns` |
+| Tests Python simples, fallback | `python-testing` |
+
+Si se agregan o retiran skills, actualizar `.agents/skills/index.md` y regenerar
+el registry local `.atl/skill-registry.md` (ignorado por Git). No instalar skills
+globales como parte del mantenimiento del proyecto.
+
+## 3. Arquitectura de tres capas
+
+AegisQ combina ML-KEM para establecer un secreto compartido de 32 bytes y
+AES-256-GCM para cifrar el payload. ML-KEM no cifra datos de usuario directamente.
+
+| Capa | Ubicación | Responsabilidad |
+| --- | --- | --- |
+| Rust core | `crates/aegisq-core/` | ML-KEM, híbrido, KDF, key wrap y streaming; `no_std` + `alloc` |
+| Bridge FFI | `crates/aegisq-pyo3/` | Conversión Rust/Python, errores, GIL; importa el core |
+| API Python | `aegisq/` | API pública, validación y ergonomía; usa el bridge |
+
+- El core nunca importa PyO3 ni conoce Python.
+- El bridge no implementa matemáticas de retículos ni lógica criptográfica.
+- El usuario final importa desde `aegisq`, no desde `aegisq._aegisq_core`.
+- No exponer tipos internos de `mlkem/math/` como API pública del crate.
+- `hybrid.rs` vive al mismo nivel que `kem.rs`, no dentro de `mlkem/`.
+
+Las guías de [arquitectura](website/src/content/docs/internals/architecture.md),
+[híbrido](website/src/content/docs/internals/hybrid-kem-dem.md) y
+[streaming](website/src/content/docs/api-reference/streaming.md) describen los formatos.
+
+## 4. Parámetros y formatos inmutables
+
+No cambiar parámetros FIPS 203 ni formatos canónicos para una optimización.
+
+| Variante | Nivel NIST | pk | sk | Capsule | k | eta1 | eta2 | du | dv |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ML-KEM-512 | 1 | 800 B | 1632 B | 768 B | 2 | 3 | 2 | 10 | 4 |
+| ML-KEM-768 (defecto) | 3 | 1184 B | 2400 B | 1088 B | 3 | 2 | 2 | 10 | 4 |
+| ML-KEM-1024 | 5 | 1568 B | 3168 B | 1568 B | 4 | 2 | 2 | 11 | 5 |
+
+`q = 3329`, `n = 256`, `zeta = 17`. El secreto compartido y la clave AES-256-GCM
+tienen 32 bytes. El nonce tiene 12 bytes y el tag 16 bytes.
+
+Paquete one-shot, ensamblado y parseado por `hybrid.rs`:
+
+```text
+[ ML-KEM Capsule | AES Nonce (12 B) | AES Auth Tag (16 B) | Ciphertext ]
+```
+
+El flujo one-shot usa directamente el secreto ML-KEM como clave AES, sin KDF
+adicional. No confundirlo con la derivación usada por key wrap y streaming.
+Streaming tiene un framing propio: no reinterpretarlo como un paquete one-shot.
+
+## 5. Reglas de seguridad
+
+- No usar `.unwrap()` ni `.expect()` en rutas de producción. Propagar errores.
+- Mantener `overflow-checks = true` en el perfil release. La aritmética
+  `wrapping_*` requiere intención explícita y justificación documentada con
+  `SAFETY`; no es, por sí misma, comportamiento indefinido de Rust.
+- Comparar material criptográfico y seleccionar claves con operaciones de
+  tiempo constante (`subtle`), no con igualdad ordinaria ni ramas sobre secretos.
+- Zeroizar material sensible nuevo al salir de scope, incluyendo rutas de error.
+  No afirmar que el código existente borra todas las copias Rust/Python.
+- One-shot: nonce aleatorio fresco de 96 bits en cada cifrado; nunca fijo,
+  secuencial ni reutilizado bajo la misma clave. Usar el RNG actual respaldado
+  por `getrandom::fill`, no reintroducir `rand` ni `rand_core::OsRng`.
+  Streaming conserva su esquema de nonces por frame; no sustituirlo por el
+  esquema one-shot. La aleatoriedad reduce colisiones, no garantiza unicidad.
+- Propagar fallos del CSPRNG. No usar fallback determinista en producción.
+- No agregar dependencias al core sin aprobación; conservar `no_std` + `alloc`.
+- No agregar logs ni `println!` al core ni registrar claves o secretos en ninguna capa.
+- Los cambios matemáticos requieren tests con vectores NIST y regresiones.
+
+### Rechazo implícito frente a errores estructurales
+
+Para una capsule de tamaño correcto cuyo contenido no verifica, ML-KEM Decaps
+devuelve silenciosamente `J(z || c)`; no debe generar un error de validez.
+Los tamaños incorrectos de claves o capsules sí generan `InvalidParameterError`.
+No eliminar estas comprobaciones estructurales.
+
+AES-GCM es distinto: un tag inválido debe producir `DecryptionError`, nunca
+plaintext no autenticado. No silenciarlo como si fuera rechazo implícito ML-KEM.
+No exponer el secreto compartido de 32 bytes en el flujo público `AegisCipher`.
+
+`EphemeralSession.close()` limita el ciclo de vida del objeto, pero no garantiza
+borrado completo ni forward secrecy de un protocolo. Autenticación de identidad,
+gestión de claves y protección contra replay requieren controles de la aplicación.
+Consultar el [modelo de seguridad](website/src/content/docs/internals/security-model.md).
+
+## 6. Convenciones del bridge y la API
+
+- Funciones `#[pyfunction]`: retornar `PyResult<T>`, liberar el GIL con
+  `py.detach()` en operaciones costosas y mapear errores mediante
+  `core_error_to_pyerr` en `crates/aegisq-pyo3/src/error.rs`.
+- Entradas bytes prestadas: evitar copias innecesarias a `Vec`. Las salidas
+  Python y getters de claves sí crean copias; no prometer zero-copy de extremo a extremo.
+- `SecurityLevel.ML_KEM_512`, `.ML_KEM_768`, `.ML_KEM_1024` son los nombres Python;
+  no usar `MlKem768` ni `MLKEM768` en ejemplos públicos.
+- Type hints completos en funciones públicas Python; docstrings Google Style.
+- Mantener `AegisCipher` como API principal y `MlKem` para operaciones avanzadas.
+  Exportar clases y excepciones públicas desde `aegisq/__init__.py`.
+- Consultar `aegisq/exceptions.py` y el bridge para la jerarquía real. No atribuir
+  herencia de `ValueError` a `InvalidParameterError` ni usar `DecapsulationError`
+  para describir los errores de tamaño actuales.
+- Constantes de parámetros: prefijos por nivel (`K_768`, `ETA1_768`, etc.).
+  Anotar los algoritmos con la referencia FIPS 203 correspondiente.
+- Conservar el módulo nativo `aegisq._aegisq_core` dentro de `aegisq/`, el nombre
+  de lib `_aegisq_core`, `cdylib`, Maturin y `abi3-py311`.
+  Python mínimo: 3.11; la ABI no prueba compatibilidad con todo runtime futuro
+  o free-threaded. No cambiar estas decisiones sin consenso explícito.
+
+## 7. Desarrollo y verificaciones
+
+Con un entorno Python de desarrollo preparado:
 
 ```bash
-# Buscar skills
-npx skills find "query"
-
-# Instalar localmente en el proyecto (sin -g)
-npx skills add owner/repo@skill-name --copy -y
+maturin develop
+maturin develop --release
+cargo test --workspace
+pytest tests/python/ -v
+cargo fmt --all -- --check
+cargo clippy --workspace -- -D warnings
+ruff check aegisq/
+ruff format --check aegisq/
+cargo audit
+cargo deny check bans licenses sources
+cargo tree -p aegisq-core
 ```
 
-> Mantenimiento: si agregás o quitás skills, regenerá `.atl/skill-registry.md` y actualizá `.agents/skills/index.md`.
-
----
-
-## 1. Identidad del Proyecto
-
-**AegisQ** es un motor de criptografía post-cuántica de uso **privado/empresarial**.
-Implementa una **arquitectura híbrida KEM-DEM** que combina:
-
-- **ML-KEM** (Module Lattice-based Key Encapsulation Mechanism), estandarizado por NIST como **FIPS 203**, para el establecimiento seguro de claves contra computadoras cuánticas.
-- **AES-256-GCM** (Advanced Encryption Standard — Galois/Counter Mode), para el cifrado autenticado del payload real del usuario.
-
-### ¿Por qué híbrido? (KEM-DEM)
-
-ML-KEM **no cifra datos directamente** — es estrictamente un mecanismo de encapsulación de claves. Solo genera 32 bytes de secreto compartido. AES-256-GCM usa ese secreto para cifrar el payload real (PDFs, JSON, video) a velocidad de hardware. Esta combinación es el estándar de la industria para PQC aplicada.
-
-**Objetivo de usuario final:** Un desarrollador web (FastAPI, Django) debe poder proteger
-datos con PQC usando 3 líneas de Python. El usuario final **nunca** interactúa con
-Rust, PyO3, retículos matemáticos, ni material criptográfico raw.
-
-### Parámetros ML-KEM por nivel de seguridad
-
-| Variante        | Nivel NIST  | pk size  | sk size  | ct size  | ss size |
-|-----------------|-------------|----------|----------|----------|---------|
-| ML-KEM-512      | 1           | 800 B    | 1632 B   | 768 B    | 32 B    |
-| ML-KEM-768      | 3 ✅ defecto | 1184 B   | 2400 B   | 1088 B   | 32 B    |
-| ML-KEM-1024     | 5           | 1568 B   | 3168 B   | 1568 B   | 32 B    |
-
-### Estructura del Paquete de Tránsito (Transit Package)
-
-El `encrypted_package` que viaja por la red tiene esta estructura **fija y canónica**.
-No la modifiques. El orden importa para el parsing:
-
-```
-[ ML-KEM Capsule (variable*) | AES Nonce (12 bytes) | AES Auth Tag (16 bytes) | Ciphertext (variable) ]
-
-* Capsule size: 768 B (ML-KEM-512) | 1088 B (ML-KEM-768) | 1568 B (ML-KEM-1024)
-```
-
-El módulo `hybrid.rs` es responsable de ensamblar y parsear esta estructura.
-
----
-
-## 2. Arquitectura de Capas — LA REGLA MÁS IMPORTANTE
-
-El proyecto tiene **tres capas herméticas**. Violar esta separación es el error más grave
-que puedes cometer. Memorízala:
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│  CAPA 3: Python API  →  aegisq/                                      │
-│  Clase AegisCipher, type hints, docstrings, manejo de errores        │
-│  Abstrae ML-KEM + AES-GCM en un único .encrypt() / .decrypt()       │
-│  ✅ Puede importar: Capa 2 (nunca directamente Capa 1)               │
-├──────────────────────────────────────────────────────────────────────┤
-│  CAPA 2: FFI Bridge  →  crates/aegisq-pyo3/                          │
-│  Traducción de tipos Rust↔Python, GIL management                    │
-│  Expone: generate_keypair, encrypt_hybrid, decrypt_hybrid            │
-│  ✅ Puede importar: aegisq-core                                      │
-│  ❌ NUNCA implementa matemáticas o lógica criptográfica              │
-├──────────────────────────────────────────────────────────────────────┤
-│  CAPA 1: Rust Core   →  crates/aegisq-core/                          │
-│  ML-KEM puro (FIPS 203) + AES-256-GCM (hybrid.rs)                   │
-│  no_std compatible, zeroize, subtle, aes-gcm                          │
-│  ❌ NUNCA importa pyo3, nunca sabe que Python existe                 │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-**Regla de oro:** Si ves `use pyo3` en `aegisq-core`, es un bug. Si ves matemáticas de
-retículos en `aegisq-pyo3`, es un bug. Si ves `import _aegisq_core` en código de usuario
-final, es un bug.
-
----
-
-## 3. Estructura de Carpetas Canónica
-
-```
-aegisq/                              ← Raíz del repositorio (workspace Cargo)
-│
-├── AGENTS.md                        ← Este archivo
-├── DOCUMENTATION.md                 ← Documentación técnica para LLMs y auditores
-├── Cargo.toml                       ← Workspace manifest (NO es un crate)
-├── pyproject.toml                   ← Build con Maturin + metadatos Python
-├── ruff.toml                        ← Configuración de Ruff (linter Python)
-├── .cargo/
-│   └── config.toml                  ← Flags de compilación globales
-├── .agents/                         ← Índice local de agentes y skills
-│   ├── README.md                    ← Hub local de agentes
-│   └── skills/
-│       ├── index.md                 ← Catálogo humano de skills instaladas
-│       └── <skill-name>/SKILL.md     ← Skills instaladas en scope proyecto
-├── .atl/                            ← Registry máquina para delegación (ignorado por git)
-│   └── skill-registry.md            ← Índice generado para sub-agentes
-│
-├── crates/
-│   ├── aegisq-core/                 ← CAPA 1: Rust puro, no_std
-│   │   ├── Cargo.toml
-│   │   └── src/
-│   │       ├── lib.rs
-│   │       ├── error.rs
-│   │       ├── kem.rs               ← API pública del crate (traits + structs KEM)
-│   │       ├── hybrid.rs            ← ★ NUEVO: Integración AES-256-GCM + ensamblado del Transit Package
-│   │       └── mlkem/
-│   │           ├── mod.rs
-│   │           ├── params.rs        ← Parámetros por nivel (k, eta1, eta2, du, dv)
-│   │           ├── math/
-│   │           │   ├── mod.rs
-│   │           │   ├── field.rs     ← Aritmética Z_q (q=3329), reducción Barrett
-│   │           │   ├── ntt.rs      ← Number Theoretic Transform
-│   │           │   ├── poly.rs     ← Polinomios en R_q = Z_q[X]/(X^256+1)
-│   │           │   └── compress.rs ← Compresión FIPS 203 §4.2.1
-│   │           ├── sampling.rs     ← CBD y rejection sampling (SHAKE-256)
-│   │           ├── keygen.rs        ← ML-KEM.KeyGen (FIPS 203 Alg. 15)
-│   │           ├── encaps.rs        ← ML-KEM.Encaps (FIPS 203 Alg. 16)
-│   │           └── decaps.rs        ← ML-KEM.Decaps con implicit rejection (Alg. 17)
-│   │
-│   └── aegisq-pyo3/                 ← CAPA 2: FFI Bridge
-│       ├── Cargo.toml
-│       └── src/
-│           ├── lib.rs               ← #[pymodule] _aegisq_core
-│           ├── types.rs             ← #[pyclass] KeyPair, SecurityLevel
-│           ├── error.rs             ← AegisQError → PyException mapping
-│           ├── kem_bindings.rs      ← #[pyfunction] generate_keypair (+ deterministic)
-│           └── hybrid_bindings.rs   ← #[pyfunction] encrypt_hybrid, decrypt_hybrid
-│
-├── aegisq/                          ← CAPA 3: Python package
-│   ├── __init__.py
-│   ├── _aegisq_core.pyi             ← Type stubs (autocompletado IDE)
-│   ├── cipher.py                    ← ★ NUEVO: Clase AegisCipher (API de alto nivel)
-│   ├── kem.py                       ← Clase MlKem (operaciones KEM crudas, uso avanzado)
-│   ├── exceptions.py               ← Jerarquía de excepciones
-│   └── py.typed                     ← Marker PEP 561
-│
-├── tests/
-│   ├── python/
-│   │   ├── conftest.py
-│   │   ├── test_kem_bindings.py     ← Tests del bridge PyO3 (KEM)
-│   │   ├── test_hybrid_bindings.py  ← Tests del bridge PyO3 (híbrido)
-│   │   ├── test_cipher_api.py       ← Tests de AegisCipher end-to-end
-│   │   ├── test_kem_api.py         ← Tests de la API Python MlKem
-│   │   ├── test_kat_vectors.py     ← ✅ NUEVO: Tests KAT vectors NIST
-│   │   └── json-files/             ← ✅ NUEVO: Vectores KAT NIST ACVP
-│   │       ├── ML-KEM-keyGen-FIPS203/
-│   │       └── ML-KEM-encapDecap-FIPS203/
-│   └── rust/                        ← (Tests en #[cfg(test)] dentro de cada crate)
-│
-├── .github/
-│   ├── workflows/
-│   │   ├── ci.yml                   ← CI/CD con GitHub Actions
-│   │   └── release.yml              ← Release workflow
-│   └── dependabot.yml               ← Actualización automática de dependencias
-│
-├── website/                          ← Documentación con Astro + Starlight
-│   ├── package.json
-│   └── src/content/docs/
-│       ├── getting-started/
-│       │   └── installation.mdx
-│       └── internals/
-│           ├── architecture.md
-│           ├── mathematical-foundation.md
-│           ├── security-model.md
-│           └── hybrid-kem-dem.md
-│
-├── CHANGELOG.md                     ← Registro de cambios
-├── deny.toml                    ← cargo-deny config (bans, licenses, sources)
-├── SECURITY.md                      ← Política de seguridad
-├── LICENSE                          ← MIT License
-├── README.md                        ← Documentación general
-├── docs/
-│   └── DOCUMENTATION.md  ← DEPRECATED → see website/
-└── .python-version                  ← Versión de Python requerida (3.11+)
-```
-
----
-
-## 4. Archivos de Configuración — Valores Canónicos
-
-> **No cambies estos valores sin consenso explícito del equipo.**
-
-### `Cargo.toml` (raíz — workspace)
-
-```toml
-[workspace]
-members  = ["crates/aegisq-core", "crates/aegisq-pyo3"]
-resolver = "2"
-
-[workspace.dependencies]
-zeroize   = { version = "1.8",  features = ["derive", "zeroize_derive"] }
-subtle    = { version = "2.6",  default-features = false }
-sha3      = { version = "0.11", default-features = false }
-getrandom = { version = "0.4",  default-features = false }
-aes-gcm   = { version = "0.10", default-features = false, features = ["aes", "alloc"] }
-thiserror = { version = "2.0", default-features = false }
-
-[profile.release]
-opt-level       = 3
-lto             = "fat"
-codegen-units   = 1
-overflow-checks = true   # ← NUNCA cambiar a false. Jamás.
-strip           = false
-```
-
-### `crates/aegisq-pyo3/Cargo.toml`
-
-```toml
-[lib]
-name       = "_aegisq_core"   # ← Nombre exacto del .so que importa Python
-crate-type = ["cdylib"]
-
-[dependencies]
-pyo3 = { version = "0.28", features = ["extension-module", "abi3-py311"] }
-```
-
-> `abi3-py311`: el `.so` compilado una vez corre en Python 3.11 → 3.13+.
-
-### `pyproject.toml`
-
-```toml
-[tool.maturin]
-manifest-path = "crates/aegisq-pyo3/Cargo.toml"
-python-source = "."
-module-name   = "aegisq._aegisq_core"   # ← El .so vive DENTRO del paquete
-features      = ["pyo3/extension-module"]
-```
-
----
-
-## 5. Reglas de Seguridad — NO NEGOCIABLES
-
-Estas reglas aplican a **todo** el código que generes. No hay excepciones.
-
-### 5.1 — Prohibiciones Absolutas en Rust
-
-```rust
-// ❌ PROHIBIDO — panic en producción, fuga de información en timing
-.unwrap()
-.expect("cualquier mensaje")
-
-// ❌ PROHIBIDO — comportamiento undefined en overflow aritmético
-a.wrapping_add(b)  // solo si es intencional y documentado con // SAFETY:
-
-// ❌ PROHIBIDO — comparaciones no-constantes de material criptográfico
-if secret_a == secret_b { ... }   // usa subtle::ConstantTimeEq
-if decapsulated_key == expected { ... }
-
-// ❌ PROHIBIDO — nonce fijo o secuencial en AES-GCM
-let nonce = [0u8; 12];   // CATASTRÓFICO: nonce reuse destruye la confidencialidad
-```
-
-### 5.2 — Obligatorio para Material Criptográfico Sensible
-
-```rust
-// ✅ OBLIGATORIO — borrar memoria al salir de scope
-#[derive(Zeroize, ZeroizeOnDrop)]
-struct SecretKey([u8; 2400]);
-
-// ✅ OBLIGATORIO — comparaciones en tiempo constante
-use subtle::ConstantTimeEq;
-let keys_match: bool = key_a.ct_eq(&key_b).into();
-
-// ✅ OBLIGATORIO — nonce aleatorio fresco en CADA operación de cifrado AES-GCM
-use rand_core::{RngCore, OsRng};
-let mut nonce = [0u8; 12];
-OsRng.fill_bytes(&mut nonce);   // 96 bits de entropía del OS en cada llamada
-
-// ✅ OBLIGATORIO — liberar GIL en operaciones costosas en PyO3
-py.detach(|| {
-    aegisq_core::hybrid::encrypt(public_key, payload, level)
-})
-```
-
-### 5.3 — Paso de Bytes entre Rust y Python (Zero-Copy)
-
-```rust
-// ✅ CORRECTO — zero-copy entrada: Python bytes → slice Rust sin copiar
-#[pyfunction]
-fn encrypt_hybrid<'py>(
-    py: Python<'py>,
-    recipient_public_key: &[u8],     // Sin copia
-    plaintext: &[u8],                  // Sin copia
-    level: SecurityLevel,
-) -> PyResult<Py<PyBytes>> {
-    py.detach(|| {
-        aegisq_core::hybrid::encrypt(recipient_public_key, plaintext, level)
-    })
-    .map(|pkg| PyBytes::new(py, &pkg).into())
-    .map_err(|e| PyErr::from(e))
-}
-
-// ❌ INCORRECTO — copia innecesaria en entrada
-let pk_vec: Vec<u8> = recipient_public_key.to_vec();  // Allocación evitable
-```
-
-### 5.4 — Implicit Rejection en Decaps (FIPS 203 §7.3)
-
-`ML-KEM Decaps` **NUNCA** debe lanzar excepción cuando el ciphertext es inválido.
-Devuelve silenciosamente una clave derivada de `z || H(c)`. Esto previene ataques CCA.
-Si ves un `return Err(...)` en la ruta de validación del ciphertext en `decaps.rs`, es un
-**bug de seguridad crítico**.
-
-### 5.5 — Manejo de Errores AES-GCM (Diferente de ML-KEM Decaps)
-
-AES-GCM SÍ debe propagar errores cuando la verificación del Auth Tag falla. Un tag inválido
-significa que el ciphertext fue **manipulado o corrompido** y el plaintext recuperado sería
-basura peligrosa. La excepción correcta es `DecryptionError` (ver §6.3).
-
-```rust
-// ✅ CORRECTO en hybrid.rs — propagar error de tag AES-GCM
-aes_gcm_cipher.decrypt(&nonce.into(), payload)
-    .map_err(|_| AegisQError::DecryptionFailed)?;
-// Nota: el error de aes-gcm no revela información útil al atacante,
-// solo indica "tag inválido". Es seguro propagarlo como excepción.
-```
-
----
-
-## 6. Convenciones de Código
-
-### Naming — SecurityLevel (ESTÁNDAR ÚNICO)
-
-```python
-# ✅ CORRECTO — UPPER_CASE, convención Python para enums/constantes
-SecurityLevel.ML_KEM_512
-SecurityLevel.ML_KEM_768   # ← default
-SecurityLevel.ML_KEM_1024
-
-# ❌ INCORRECTO — mezclar estilos
-SecurityLevel.MlKem768
-SecurityLevel.MLKEM768
-```
-
-En Rust, el enum interno usa PascalCase (`MlKem768`) pero el `#[pyclass]` lo renombra a
-UPPER_CASE via `#[pyo3(name = "ML_KEM_768")]` para respetar la convención Python.
-
-### Rust (`aegisq-core`)
-
-- Todos los módulos internos deben compilar con `#![no_std]` + `alloc` (sin `std`)
-- `aes-gcm` v0.10 con `default-features = false` es compatible con `no_std`
-- Nombra las constantes de params con el prefijo del nivel: `K_768`, `ETA1_768`, etc.
-- Los algoritmos del FIPS 203 deben tener un comentario `// FIPS 203 Alg. X` exacto
-- Tests unitarios en el mismo archivo (`#[cfg(test)]`) con KAT vectors del NIST
-- El módulo `hybrid.rs` vive al mismo nivel que `kem.rs`, no dentro de `mlkem/`
-
-### Rust (`aegisq-pyo3`)
-
-- Todas las funciones `#[pyfunction]` retornan `PyResult<T>`, nunca hacen `.unwrap()`
-- El mapeo de errores usa `map_err(|e| PyErr::from(e))` con conversión automática
-- Las excepciones customizadas de AegisQ se registran en `lib.rs` como subclases de `PyException`
-- `kem_bindings.rs` expone operaciones KEM crudas (generate_keypair, encapsulate, decapsulate)
-- `hybrid_bindings.rs` expone operaciones híbridas (encrypt_hybrid, decrypt_hybrid)
-
-### Python (`aegisq/`)
-
-- Type hints completos en todas las funciones públicas
-- Docstrings en formato Google Style
-- **`AegisCipher`** en `cipher.py` es la clase principal de alto nivel para usuarios finales
-- **`MlKem`** en `kem.py` es la clase de operaciones KEM crudas para usuarios avanzados
-- `__init__.py` exporta: `AegisCipher`, `MlKem`, `SecurityLevel`, y todas las excepciones
-- El usuario nunca debe necesitar importar desde `aegisq._aegisq_core` directamente
-
-### 6.3 — Jerarquía de Excepciones Python
-
-```python
-AegisQError(Exception)                   ← Base, siempre catcheable
-├── DecapsulationError(AegisQError)      ← ML-KEM: error estructural (tamaño incorrecto)
-│                                        ← NOTA: ciphertext inválido NO lanza esto (implicit rejection)
-├── DecryptionError(AegisQError)         ← ★ NUEVO: AES-GCM tag verification failed
-│                                        ← Indica payload manipulado o clave incorrecta
-├── InvalidParameterError(AegisQError, ValueError)  ← Tamaños de buffer incorrectos, nivel inválido
-└── RngError(AegisQError)                ← CSPRNG del OS no disponible
-```
-
-### 6.4 — API de Alto Nivel `AegisCipher` (cipher.py)
-
-```python
-from aegisq import AegisCipher, SecurityLevel
-
-# Receptor genera su keypair
-cipher_bob = AegisCipher(level=SecurityLevel.ML_KEM_768)
-keypair = cipher_bob.generate_keypair()
-
-# Emisor cifra payload con la clave pública del receptor
-cipher_alice = AegisCipher(level=SecurityLevel.ML_KEM_768)
-package: bytes = cipher_alice.encrypt(
-    plaintext=b"Datos secretos",
-    recipient_public_key=keypair.public_key
-)
-# package = [ ML-KEM Capsule | Nonce (12B) | Auth Tag (16B) | Ciphertext ]
-
-# Receptor descifra
-plaintext: bytes = cipher_bob.decrypt(
-    encrypted_package=package,
-    secret_key=keypair.secret_key
-)
-```
-
-#### KeyPair Properties and Methods
-
-```python
-keypair.public_key   # bytes — clave pública ML-KEM (800/1184/1568 bytes según nivel)
-keypair.secret_key   # bytes — clave secreta (solo el receptor la tiene)
-keypair.level        # SecurityLevel — nivel de seguridad del keypair
-
-def public_key_b64(self) -> str:
-    """Serializa la clave pública a Base64 URL-safe (sin padding)."""
-```
-
-### 6.5 — Serialización Base64 URL-safe
-
-```python
-# Serializar clave pública a Base64 URL-safe (sin padding)
-b64 = keypair.public_key_b64()
-
-# Cargar clave pública desde Base64 URL-safe
-kem = MlKem(level=SecurityLevel.ML_KEM_768)
-public_key_bytes = kem.load_public_key_b64(b64)
-```
-
-La serialización Base64 permite transmitir claves públicas ML-KEM como strings
-texto (ej: en JSON, environment variables, headers HTTP) sin necesidad de
-transmitir los bytes raw de 800/1184/1568 bytes.
-
-El formato usado es URL-safe sin padding (RFC 4648 §5), compatible con el
-estándar NIST para intercambio de claves.
-
-## 7. Comandos de Desarrollo
-
-```bash
-# ── Compilación ──────────────────────────────────────────────────────────
-maturin develop                          # Debug, para ciclo de desarrollo
-maturin develop --release                # Release, para benchmarks
-
-# ── Testing ──────────────────────────────────────────────────────────────
-cargo test --workspace                   # Todos los tests Rust
-cargo test -p aegisq-core               # Solo tests del core criptográfico
-pytest tests/python/ -v                  # Todos los tests Python
-pytest tests/python/test_cipher_api.py  # Solo tests AegisCipher
-
-# ── Calidad de Código ─────────────────────────────────────────────────────
-cargo clippy --workspace -- -D warnings  # Linter (warnings = errores)
-cargo fmt --all                          # Formato Rust
-ruff check aegisq/           # Linter Python (reemplaza flake8 + isort)
-ruff format --check aegisq/  # Formato Python (reemplaza black)
-
-# ── Seguridad ─────────────────────────────────────────────────────────────
-cargo audit                              # Auditoría de dependencias
-cargo tree -p aegisq-core               # Verificar árbol de deps (no_std compliance)
-```
-
-> **Regla para el agente:** Después de generar código Rust, **siempre** verifica con
-> `cargo clippy --workspace -- -D warnings`. Si clippy se queja, corrige antes de presentar.
-
----
-
-## 8. Parámetros Matemáticos de ML-KEM
-
-Estos son los valores del FIPS 203. **No los cambies, no los "optimices".**
-
-```
-q       = 3329          ← Módulo primo del campo Z_q
-n       = 256           ← Grado del polinomio (X^256 + 1)
-zeta    = 17            ← Raíz primitiva 256-ésima de la unidad en Z_q
-
-             k    eta1  eta2  du   dv
-ML-KEM-512:  2    3     2    10    4
-ML-KEM-768:  3    2     2    10    4
-ML-KEM-1024: 4    2     2    11    5
-
-Shared secret (salida ML-KEM) = 32 bytes  (para los 3 niveles)
-AES-256-GCM key = 32 bytes = shared_secret  (1:1, sin KDF adicional)
-AES-256-GCM nonce = 12 bytes (96 bits, aleatorio por OsRng en cada encrypt)
-AES-256-GCM auth tag = 16 bytes (128 bits)
-```
-
----
-
-## 9. Orden de Implementación (Hoja de Ruta)
-
-Implementa **estrictamente en este orden**. No saltes fases.
-Cada fase debe tener sus tests pasando antes de avanzar a la siguiente.
-
-| Fase | Módulo destino                            | Descripción                                           | Estado       |
-|------|-------------------------------------------|-------------------------------------------------------|--------------|
-| 1    | `aegisq-core/mlkem/math/field.rs`         | Aritmética Z_{3329}, reducción Barrett, tiempo const. | ✅ Completo |
-| 2    | `aegisq-core/mlkem/math/ntt.rs`           | NTT, NTT inversa, raíces precalculadas                | ✅ Completo |
-| 3    | `aegisq-core/mlkem/math/poly.rs`          | Operaciones sobre polinomios en R_q                   | ✅ Completo |
-| 4    | `aegisq-core/mlkem/math/compress.rs`      | Compress_d / Decompress_d (FIPS 203 §4.2.1)           | ✅ Completo |
-| 5    | `aegisq-core/mlkem/params.rs`             | Struct de parámetros por nivel de seguridad           | ✅ Completo |
-| 6    | `aegisq-core/mlkem/sampling.rs`           | CBD, rejection sampling, XOF (SHAKE-128/256)          | ✅ Completo |
-| 7    | `aegisq-core/mlkem/keygen.rs`             | ML-KEM.KeyGen (FIPS 203 Alg. 15)                     | ✅ Completo |
-| 8    | `aegisq-core/mlkem/encaps.rs`             | ML-KEM.Encaps (FIPS 203 Alg. 16)                     | ✅ Completo |
-| 9    | `aegisq-core/mlkem/decaps.rs`             | ML-KEM.Decaps con implicit rejection (Alg. 17)        | ✅ Completo |
-| 10   | `aegisq-core/kem.rs`                      | API pública KEM del crate (traits + structs)          | ✅ Completo |
-| 11   | `aegisq-core/hybrid.rs`                   | ★ AES-256-GCM + ensamblado Transit Package            | ✅ Completo |
-| 12   | `aegisq-pyo3/error.rs`                    | Mapeo de errores Rust → PyException                   | ✅ Completo |
-| 13   | `aegisq-pyo3/types.rs`                    | #[pyclass] KeyPair, SecurityLevel                     | ✅ Completo |
-| 14   | `aegisq-pyo3/kem_bindings.rs`             | #[pyfunction] generate_keypair, encapsulate, decaps   | ✅ Completo |
-| 15   | `aegisq-pyo3/hybrid_bindings.rs`          | ★ #[pyfunction] encrypt_hybrid, decrypt_hybrid        | ✅ Completo |
-| 16   | `aegisq-pyo3/lib.rs`                      | Registro del módulo Python _aegisq_core               | ✅ Completo |
-| 17   | `aegisq/exceptions.py`                    | Jerarquía de excepciones Python (incl. DecryptionError)| ✅ Completo |
-| 18   | `aegisq/_aegisq_core.pyi`                 | Type stubs para IDE (KEM + híbrido)                   | ✅ Completo |
-| 19   | `aegisq/kem.py`                           | Clase MlKem (operaciones KEM crudas, uso avanzado)    | ✅ Completo |
-| 20   | `aegisq/cipher.py`                        | ★ Clase AegisCipher (API híbrida de alto nivel)       | ✅ Completo |
-| 21   | `aegisq/__init__.py`                      | Exports públicos del paquete                          | ✅ Completo |
-| 22   | `tests/python/test_kem_bindings.py`       | Tests del bridge PyO3 (KEM) con pytest                | ✅ Completo |
-| 23   | `tests/python/test_hybrid_bindings.py`    | ★ Tests del bridge PyO3 (híbrido)                    | ✅ Completo |
-| 24   | `tests/python/test_cipher_api.py`         | ★ Tests AegisCipher end-to-end                       | ✅ Completo |
-| 25   | `tests/python/test_kem_api.py`            | Tests KAT vectors NIST + roundtrip                   | ✅ Completo |
-| 26   | `.github/workflows/ci.yml`                | CI/CD con GitHub Actions                             | ✅ Completo |
-| 27   | `tests/python/json-files/`               | Vectores KAT NIST ACVP para ML-KEM                  | ✅ Completo |
-| 27b  | `tests/python/test_kat_vectors.py`       | Tests de verificación con KAT vectors                | ✅ Completo |
-| 28   | `aegisq/session.py`                      | EphemeralSession con forward secrecy                | ✅ Completo |
-| 29   | `aegisq/cipher.py` + `test_cipher_async.py` | Soporte async (encrypt_async/decrypt_async)       | ✅ Completo |
-| 30   | `crates/aegisq-core/src/kdf.rs` + `key_wrap.rs` + `kem.rs` (validate_*) | HKDF/HMAC-SHA3-256 + cifrado de secret_key (v1.3.0) | ✅ v1.3.0 |
-| 31   | `crates/aegisq-pyo3/src/types.rs` + `key_io_bindings.rs` + `aegisq/keys.py` + `deny.toml` | Serializacion PEM/JSON/encrypted + cargo-deny gate (v1.3.0) | ✅ v1.3.0 |
-
----
-
-## 10. Decisiones de Diseño Fijas (No Reabrir)
-
-| Decisión | Elección | Razón |
-|----------|----------|-------|
-| Build system | Maturin | Estándar de facto para PyO3, abi3, wheels, editable installs |
-| FFI | PyO3 0.28+ | API moderna, safe Rust, free-threading ready, manejo automático de GIL |
-| Python mínimo | 3.11 | abi3-py311 cubre la base instalada empresarial relevante |
-| Hash/XOF | sha3 crate (SHAKE-128/256) | no_std, auditado, FIPS 203 requerido |
-| Cifrado simétrico | aes-gcm crate v0.10 | no_std, AEAD autenticado, hardware AES-NI vía crate `aes` |
-| Nonce AES-GCM | 96 bits aleatorios por OsRng | Probabilidad de colisión negligible, sin estado compartido |
-| Zeroización | zeroize crate | Borrado de memoria sensible resistente a optimizaciones |
-| Tiempo constante | subtle crate | Operaciones CT certificadas, no_std compatible |
-| Nivel por defecto | ML-KEM-768 | Balance óptimo seguridad/rendimiento, recomendado por NIST |
-| Naming Python | UPPER_CASE para SecurityLevel | PEP 8: constantes en UPPER_CASE; via `#[pyo3(name)]` |
-| Arquitectura de errores | Rust thiserror → PyO3 PyErr | Stack traces con sentido en Python, errores tipados en Rust |
-| AES-GCM auth tag fail | Lanza DecryptionError (NO silencioso) | Diferente a ML-KEM implicit rejection; tag fail = tampering |
-| API de usuario final | Clase AegisCipher | Abstrae KEM+DEM en una sola interfaz ergonómica |
-
----
-
-## 11. Lo que el Agente NUNCA Debe Hacer
-
-- ❌ Agregar dependencias a `aegisq-core` sin aprobación (rompe la compatibilidad no_std)
-- ❌ Usar `rand` (el crate completo) — solo `rand_core` con `OsRng` para mantener no_std
-- ❌ Usar un nonce fijo, hardcodeado, o secuencial en AES-GCM — **destruye la confidencialidad**
-- ❌ Reutilizar el mismo nonce con la misma clave en AES-GCM — **catastrófico**
-- ❌ Silenciar el error de tag AES-GCM (≠ ML-KEM implicit rejection) — debe lanzar `DecryptionError`
-- ❌ Implementar su propia aritmética modular sin los tests KAT del NIST primero
-- ❌ Cambiar los tamaños de buffer definidos en la sección 8 de este documento
-- ❌ Retornar `Err` en la ruta de ciphertext inválido de ML-KEM `decaps` (ver §5.4)
-- ❌ Mover el archivo `.so` fuera de `aegisq/` — debe vivir en `aegisq._aegisq_core`
-- ❌ Exponer tipos internos de `mlkem/math/` a través del `pub use` en `lib.rs`
-- ❌ Generar código sin type hints en Python
-- ❌ Agregar `println!` o logs a `aegisq-core` (no_std y potencial fuga de información)
-- ❌ Usar `SecurityLevel.MlKem768` — el naming canónico es `SecurityLevel.ML_KEM_768`
-- ❌ Exponer el shared secret de 32 bytes directamente al usuario Python en el flujo `AegisCipher`
-
----
-
-## 12. Workflow de Ramificación (GitFlow)
-
-Este proyecto sigue **GitFlow**. La rama `main` siempre contiene la última
-versión estable publicada en PyPI. La rama `develop` contiene el trabajo en
-curso para el próximo release. **Ningún commit directo** a `main` o `develop`
-— todo cambio entra vía Pull Request y se mergea con **squash**.
-
-### 12.1 Tabla de creación de ramas
-
-| Si vas a... | Creá rama desde | Con prefijo | Y abrí PR contra |
-|-------------|-----------------|-------------|------------------|
-| Agregar feature | `develop` | `feature/<nombre-kebab-corto>` | `develop` |
-| Arreglar un bug | `develop` | `fix/<descripcion-corta>` | `develop` |
-| Mantenimiento (deps, configs) | `develop` | `chore/<que-cambia>` | `develop` |
-| Solo documentación | `develop` | `docs/<que-documenta>` | `develop` |
-| Refactor sin cambio funcional | `develop` | `refactor/<que-mejora>` | `develop` |
-| Tests sin cambio de prod | `develop` | `test/<que-cubre>` | `develop` |
-| Preparar un release | `develop` | `release/vX.Y.Z` | `main` |
-| Hotfix URGENTE en producción | `main` (en el tag) | `hotfix/vX.Y.Z+1` | `main` |
-
-**Reglas de naming**:
-- Usá kebab-case (guiones), no snake_case ni camelCase
-- Sé descriptivo pero conciso: `fix/nonce-reuse-on-retry` ✓, `fix/bug` ✗
-- Referenciá el issue si existe: `fix/issue-123-public-key-validation`
-
-### 12.2 Reglas de merge (en GitHub)
-
-- ✅ **SIEMPRE** "Squash and merge" — un commit limpio por feature/fix
-- ❌ **NUNCA** "Create a merge commit" — contamina la historia
-- ❌ **NUNCA** "Rebase and merge" — pierde la atribución de commits
-- Mensaje del squash: mantener el del PR (Conventional Commit)
-
-### 12.3 Conventional Commits (tipos válidos)
-
-El mensaje del commit y del PR debe seguir [Conventional Commits 1.0.0](https://www.conventionalcommits.org/):
-
-| Tipo | Cuándo | Ejemplo |
-|------|--------|---------|
-| `feat` | Nueva feature | `feat(cipher): add streaming API for large files` |
-| `fix` | Bug fix | `fix(hybrid): prevent nonce reuse on retry` |
-| `docs` | Solo documentación | `docs(readme): clarify Python 3.12 install` |
-| `style` | Formato sin cambio lógico | `style(kem): apply ruff format` |
-| `refactor` | Refactor sin cambio funcional | `refactor(error): unify AegisQError variants` |
-| `perf` | Mejora de performance | `perf(ntt): cache precomputed zetas` |
-| `test` | Solo tests | `test(kat): add v1.2.0 official vectors` |
-| `chore` | Mantenimiento general | `chore(deps): bump sha3 to 0.12` |
-| `ci` | CI/CD | `ci(workflow): add dependabot weekly schedule` |
-| `build` | Build system | `build(maturin): enable abi3-py312` |
-| `revert` | Revertir cambio | `revert: feat(cipher) streaming due to regression` |
-
-**Breaking changes**: marcar con `!` después del tipo o en el footer:
-```
-feat(cipher)!: change encrypt() return type
-
-BREAKING CHANGE: callers must now use .ciphertext property
-```
-
-### 12.4 Release flow completo
-
-```
- develop                          main (tag v1.2.0)
-   │                                │
-   ├── feature/horizonte-1 ───┐    │
-   ├── fix/nist-compliance ───┤    │
-   └── chore/bump-deps ───────┤    │
-                              │    │
-                              ▼    │
-                       release/v1.3.0  (bump version, CHANGELOG, fix de últimos bugs)
-                              │    │
-                              ├── PR squash ──► main (tag v1.3.0, auto-publish PyPI)
-                              │    │
-                              └── PR squash ──► develop (sync post-release)
-```
-
-**Pasos detallados**:
-
-1. Cuando `develop` madura y está listo para release, cortar rama:
-   ```bash
-   git checkout develop && git pull
-   git checkout -b release/v1.3.0
-   ```
-
-2. En `release/v1.3.0`:
-   - Bump version en `pyproject.toml` y `Cargo.toml`
-   - Actualizar `CHANGELOG.md`
-   - Fix de últimos bugs (cualquier cambio va en ESTA rama, no en `develop`)
-
-3. PR `release/v1.3.0` → `main` (squash merge). El merge activa el tag `vX.Y.Z` y la publicación automática a PyPI vía `release.yml`.
-
-4. **Inmediatamente después**: PR de sync `main` → `develop` (squash merge).
-
-5. **Bump `develop` a la prerelease de la SIGUIENTE versión** (ver §12.7).
-
-6. (Opcional) Eliminar rama `release/v1.3.0` local y remoto. El tag `vX.Y.Z` queda en `main`.
-
-### 12.4.1 Regla critica: TestPyPI antes de PyPI prod
-
-**Toda publicacion de produccion en PyPI debe estar precedida por al
-menos un tag rc publicado en TestPyPI.** Esta regla se enforce
-automaticamente en `.github/workflows/release.yml` (job
-`check-branch` > step `verify-rc`).
-
-Concretamente:
-
-| Accion | Resultado en `release.yml` |
-|---|---|
-| Tag `v1.5.0rc1` en develop (u origin) | Build -> TestPyPI OK. **No publica a PyPI prod.** |
-| Tag `v1.5.0` en main sin rc previo | Build OK, pero `check-branch` FALLA con error claro. PyPI y GitHub Release no corren. |
-| Tag `v1.5.0` en main con `v1.5.0rc1` previo | Build -> TestPyPI OK, **publica a PyPI prod**, GitHub Release creado. |
-
-**Workflow para hacer un release correctamente:**
-
-```bash
-# 1. Asegurarse de que develop esta en <X>.<Y+1>.0rc1
-#    (sigue la convencion de §12.7).
-git checkout develop && git pull --ff-only
-
-# 2. Tag del prerelease en develop. ESTO dispara TestPyPI.
-git tag -a v1.6.0rc1 -m "v1.6.0rc1 — prerelease" <commit>
-git push origin v1.6.0rc1
-# Esperar a que release.yml publique a TestPyPI y verificar.
-
-# 3. Recien ahora, cut del release branch y PR a main.
-git checkout -b release/v1.6.0 develop
-# Bump de version 1.6.0-rc1 -> 1.6.0 + CHANGELOG.
-# PR a main. Despues del merge:
-
-# 4. Tag de produccion en main. ESTO dispara PyPI prod
-#    (porque ahora existe v1.6.0rc1 en el repo).
-git tag -a v1.6.0 -m "v1.6.0 — release" <merge-commit>
-git push origin v1.6.0
-```
-
-Si el tag de produccion se pushea **sin** el rc previo, el job
-`check-branch` falla con:
-
-> Tag 'v1.6.0' es una publicacion de produccion pero no existe
-> ningun tag rc previo (v1.6.0rc*) para esta version. Antes de
-> mergear a main y taggear v1.6.0, hay que publicar primero a
-> TestPyPI.
-
-El bypass de emergencia es: tagear rc1 inmediatamente, esperar a
-que TestPyPI publique, y luego tagear la produccion. No hay un
-atajo para saltarse TestPyPI.
-
-### 12.5 Post-release checklist
-
-Después de mergear un release a `main`, en orden:
-
-- [ ] Tag `vX.Y.Z` pusheado a `origin`
-- [ ] PyPI publicó correctamente (verificar via `pip install aegisq-pqc==vX.Y.Z`)
-- [ ] PR de sync a `develop` abierto y mergeado
-- [ ] **PR de bump de `develop` a la siguiente prerelease abierto y mergeado** (ver §12.7)
-- [ ] `git diff main origin/develop --shortstat` muestra solo el bump de versión en `develop`
-- [ ] GitHub Release creado con notas extraídas del `CHANGELOG.md`
-- [ ] Rama `release/vX.Y.Z` eliminada (opcional)
-
-### 12.7 Convención de versionado en `develop`
-
-`develop` sigue una **convención distinta** a `main`:
-
-| Rama | Convención de version | Ejemplo tras v1.4.0 |
-|---|---|---|
-| `main` | versión estable publicada | `1.4.0` |
-| `develop` | **prerelease de la siguiente versión** | `1.5.0rc1` |
-
-Razón: `release.yml` distingue TestPyPI de PyPI prod según el contenido del tag:
-
-```yaml
-publish-testpypi:
-  if: contains(github.ref, 'rc') && branch == 'develop'
-publish:
-  if: !contains(github.ref, 'rc') && branch == 'main'
-```
-
-Tags `vX.Y.ZrcN` desde `develop` → TestPyPI. Tags `vX.Y.Z` desde `main` → PyPI prod.
-
-Si `develop` queda en `1.4.0` después de que `v1.4.0` sale, el próximo tag `v1.5.0rc1` se construye contra wheels que dicen ser `1.4.0` — `pip install aegisq-pqc==1.5.0rc1` desde TestPyPI falla porque la metadata no coincide, y `maturin develop` desde `develop` produce un wheel etiquetado `1.4.0` que PyPI rechaza por duplicado.
-
-**Regla**: tras mergear el PR de sync post-release (§12.5 paso 4), abrir inmediatamente un PR `chore/bump-develop-to-vX.Y+1.Zrc1` que bumpea los 3 manifests (`pyproject.toml`, `crates/aegisq-core/Cargo.toml`, `crates/aegisq-pyo3/Cargo.toml`) y solo eso. Sin cambios de código. CI debe pasar 6/6. Este PR puede mergearse sin review detallado.
-
-**Histórico de tags que demuestra la convención** (verificado en git tag):
-
-```
-v1.0.0rc1 → v1.0.0
-v1.1.0rc1 → v1.1.0
-v1.2.0rc1 → v1.2.0
-v1.3.0rc1 → v1.3.0
-v1.4.0         ← develop debería estar en 1.5.0rc1
-```
-
-Tras merge de este PR, develop queda en `1.5.0rc1` y la próxima release será `cut release/v1.5.0` desde develop.
-
-### 12.6 Hotfix flow (urgencias en producción)
-
-Si se descubre un bug crítico en `v1.2.0` (ya publicado en PyPI):
-
-1. Cortar hotfix desde el tag `v1.2.0` en `main`:
-   ```bash
-   git checkout main && git pull
-   git checkout v1.2.0  # el tag, no main
-   git checkout -b hotfix/v1.2.1
-   ```
-
-2. Aplicar el fix MÍNIMO necesario.
-
-3. PR `hotfix/v1.2.1` → `main` (squash merge). El merge activa el tag `v1.2.1` y la publicación a PyPI.
-
-4. **Crítico**: PR `hotfix/v1.2.1` → `develop` también, para que el fix se incluya en `v1.3.0`.
-
-### 12.7 Reglas de protección de rama (recordatorio)
-
-Las reglas en GitHub prohíben explícitamente:
-- ❌ Force-push a `main` o `develop` (preservar historia)
-- ❌ Merge commits directos (mantener historia lineal)
-- ❌ Commits directos sin PR (forzar revisión)
-
-Si ves "Repository rule violations found" en un push, NO intentes forzar — significa que estás rompiendo el flujo. Volvé atrás y usá el patrón correcto (PR con squash).
-
----
-
-## 13. Nomenclatura de Paquete y Versionado
-
-| Atributo | Valor | Notas |
-|----------|-------|-------|
-| PyPI package name | `aegisq-pqc` | Nombre para `pip install` |
-| Python import name | `aegisq` | Nombre para `import aegisq` |
-| Módulo interno | `aegisq._aegisq_core` | El `.so` compilado por Maturin |
-| Versión actual | `1.2.0` | Sincronizado con `pyproject.toml` |
-| Siguiente versión | `1.3.0` | Por definir según roadmap de features |
-
-> ⚠️ **Nota:** No confundas el nombre del paquete PyPI (`aegisq-pqc`) con el nombre
-> del módulo Python (`aegisq`). Ambos son el mismo paquete; PyPI usa guiones
-> porque no permite guiones bajos en los nombres de paquetes.
->
-> ```bash
-> # Instalación (desde PyPI o git)
-> pip install aegisq-pqc
->
-> # Uso en Python (import siempre con guiones bajos)
-> from aegisq import AegisCipher, SecurityLevel
-> ```
-
----
-
-## 14. Referencias Normativas
-
-| Documento | URL |
-|-----------|-----|
-| FIPS 203 (ML-KEM estándar oficial) | https://csrc.nist.gov/pubs/fips/203/final |
-| NIST KAT vectors ML-KEM | https://csrc.nist.gov/projects/post-quantum-cryptography |
-| PyO3 User Guide | https://pyo3.rs/latest/ |
-| Maturin Docs | https://www.maturin.rs/ |
-| aes-gcm crate | https://docs.rs/aes-gcm |
-| zeroize crate | https://docs.rs/zeroize |
-| subtle crate | https://docs.rs/subtle |
-| NIST SP 800-38D (AES-GCM spec) | https://csrc.nist.gov/pubs/sp/800/38/d/final |
-| Conventional Commits 1.0.0 | https://www.conventionalcommits.org/ |
-| GitFlow (Vincent Driessen, 2010) | https://nvie.com/posts/a-successful-git-branching-model/ |
-
----
-
-*Última actualización: v1.2.0 + docs/gitflow-workflow — 30/29 secciones (incorpora workflow de ramificación formal). Listo para release.*
+Tras generar Rust, ejecutar siempre Clippy y corregir advertencias antes de
+presentar el cambio. Los tests unitarios Rust viven en los módulos; los tests
+Python y corpus NIST están en `tests/python/`. No retirar fixtures como si fueran
+documentación histórica. Una afirmación de tests pasando exige una ejecución real.
+
+Para la web, seguir `website/README.md`: Astro check, build, contratos y pruebas
+de hosting. La CI web valida; no publica automáticamente.
+
+## 8. Documentación y diseño
+
+- Mantener fuentes canónicas EN/ES en `website/src/content/docs/` y su carpeta `es/`.
+- Actualizar ambas versiones cuando cambia un contrato o ejemplo público.
+- Evitar duplicar referencias completas de API, fases terminadas o tablas de
+  versiones del checkout en guías de mantenimiento. El historial va en el changelog.
+- Preservar rutas públicas, búsqueda Pagefind y controles nativos Starlight.
+- Conservar licencias y atribuciones de fuentes; los reportes locales de QA no
+  se sirven ni se versionan como contenido público.
+- Distinguir objetivos de accesibilidad de evidencia verificada. No inventar
+  certificaciones o auditorías para respaldar el diseño.
+
+## 9. Hosting
+
+`aegisq.dev` aloja la portada y `docs.aegisq.dev` la documentación, mediante dos
+Workers Static Assets con Custom Domains. Cloudflare administra DNS y TLS;
+la VPS no es un origin. No agregar SSR, bindings o servicios de pago al hosting.
+
+La publicación es manual y requiere aprobación independiente: contenido revisado
+en `main`, cuenta/zona correctas, Workers Free y ausencia de conflictos DNS/domains.
+Credenciales fuera de Git; nunca solicitarlas por chat. Publicar docs primero,
+verificar y luego home. Detenerse ante un fallo parcial; consultar el runbook.
+Un merge documental no requiere tags de PyPI ni autoriza un despliegue.
+
+## 10. Cambios que requieren aprobación
+
+No modificar decisiones criptográficas, parámetros, formatos de tránsito,
+arquitectura de capas, dependencias del core, configuración de compilación,
+versión mínima Python o esquema de errores como parte de una limpieza documental.
+Una discrepancia entre guía e implementación se verifica, no se corrige cambiando
+silenciosamente la implementación. No redefinir soporte en `SECURITY.md` sin una
+decisión explícita de mantenimiento.
+
+## 11. Identidad del paquete
+
+Instalación: `pip install aegisq-pqc`. Importación: `from aegisq import AegisCipher`.
+El nombre de la distribución PyPI y el módulo Python son distintos identificadores.
+Consultar versiones en manifiestos/PyPI, no mantener una segunda versión fija aquí.
+
+## 12. Entrega mediante GitFlow
+
+### 12.1 Ramas y PRs
+
+Trabajo desde `develop`, con prefijos `feature/`, `fix/`, `chore/`, `docs/`,
+`refactor/` o `test/`, y PR contra `develop`. Nombres descriptivos en kebab-case;
+referenciar el issue si existe. Releases: `release/vX.Y.Z` desde `develop` hacia
+`main`. Hotfixes: desde el tag estable afectado, `hotfix/vX.Y.Z`, hacia `main`
+y llevar también el arreglo a `develop`.
+
+### 12.2 Merge y protección
+
+Solo squash merge mediante PR. Nunca commits directos, force-push, merge commits
+ni rebase merge en `main`/`develop`. Si GitHub rechaza un push, respetar las reglas,
+no intentar forzarlo. No revertir cambios ajenos ni tocar ediciones locales del usuario.
+
+### 12.3 Mensajes
+
+Conventional Commits para commits y títulos de PR (`feat`, `fix`, `docs`, `style`,
+`refactor`, `perf`, `test`, `chore`, `ci`, `build`, `revert`). Marcar cambios
+incompatibles con `!` y explicar `BREAKING CHANGE`. No añadir atribución de IA
+ni `Co-Authored-By`.
+
+### 12.4 Versiones de desarrollo
+
+Después de un release, `develop` debe avanzar a la siguiente prerelease mediante
+un PR de bump aislado en `pyproject.toml` y los manifiestos de ambos crates,
+manteniendo los lockfiles coherentes. No mezclar cambios funcionales ni asumir que
+la rama `main` o su versión de checkout siempre coinciden con el último PyPI.
+
+### 12.5 TestPyPI antes de producción
+
+1. Verificar que versión de manifiestos y tag RC corresponden; publicar el RC
+   desde `develop` mediante `vX.Y.ZrcN` y esperar a que TestPyPI termine correctamente.
+2. Preparar `release/vX.Y.Z`, actualizar los tres manifiestos y el changelog,
+   ejecutar las verificaciones y abrir PR contra `main`.
+3. Tras squash merge, crear/pushear el tag estable autorizado `vX.Y.Z` en `main`.
+   **El tag, no el merge por sí solo, dispara `.github/workflows/release.yml`.**
+4. Verificar publicación PyPI, instalación y GitHub Release antes de dar el release
+   por terminado. La misma regla RC previa aplica a hotfixes.
+5. Llevar diferencias del release a `develop` mediante PR si hay diferencias de
+   contenido, y preparar la siguiente prerelease. No crear PRs de sync vacíos
+   porque los hashes difieran después de squash; comparar árboles completos.
+
+El job `check-branch`, step `verify-rc`, exige que exista un tag RC de la misma
+versión base. No comprueba que TestPyPI haya publicado correctamente: esa
+verificación sigue siendo responsabilidad del mantenedor. No saltarse el RC ni
+crear tags/publicaciones como efecto secundario de cambios de documentación.

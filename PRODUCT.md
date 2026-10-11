@@ -39,8 +39,13 @@ and security boundaries while integrating the library into Python projects.
   language switching. Do not change public Python APIs or cryptographic code.
 - Prefer static generation and minimal JavaScript. Do not introduce animation
   frameworks merely for decorative effects.
-- Preserve historical documentation until a migration plan is approved.
-- Hosting/domain and supported-version policy remain open decisions.
+- Keep current guides in the canonical source; release history belongs in
+  `CHANGELOG.md`, not duplicate technical manuals or completed-phase roadmaps.
+- Serve the homepage at `aegisq.dev` and documentation at `docs.aegisq.dev`
+  through free-only Cloudflare Workers Static Assets with Custom Domains.
+  Publication is manual and separately approved; see `website/README.md`.
+- Supported-version policy is governed by `SECURITY.md`; do not infer support
+  from the current checkout or invent commitments for later releases.
 
 ## Brand Commitments
 

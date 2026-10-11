@@ -4,9 +4,10 @@ Este es el hub local de agentes para AegisQ.
 
 ## Fuente de verdad
 
-- `../AGENTS.md` — reglas canónicas, arquitectura y convenciones.
-- `skills/index.md` — índice humano de skills instaladas en scope proyecto.
-- `../.atl/skill-registry.md` — registry máquina para delegación.
+- [AGENTS.md](../AGENTS.md) — reglas canónicas, arquitectura y convenciones.
+- [skills/index.md](skills/index.md) — índice humano de skills locales.
+- `../.atl/skill-registry.md` — registry local generado, ignorado por Git;
+  puede no existir en un checkout nuevo.
 
 ## Estado actual
 
