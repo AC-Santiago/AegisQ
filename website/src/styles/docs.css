@@ -134,7 +134,7 @@ button:disabled { cursor: not-allowed; opacity: 0.65; }
 .aq-chapters a:hover { background: rgb(255 255 255 / 0.08); }
 .aq-chapters a[aria-current] { border-bottom-color: var(--aq-band-text); font-weight: 600; }
 .aq-chapters a:focus-visible { outline-color: var(--aq-band-text); outline-offset: -4px; }
-starlight-menu-button button { top: calc((var(--aq-masthead-height) - var(--sl-menu-button-size)) / 2); border: 1px solid var(--aq-border-strong); border-radius: var(--aq-radius); box-shadow: none; }
+starlight-menu-button button { top: calc((var(--aq-masthead-height) - var(--sl-menu-button-size)) / 2); align-items: center; justify-content: center; border: 1px solid var(--aq-border-strong); border-radius: var(--aq-radius); box-shadow: none; }
 site-search button[data-open-modal] { min-height: 2.75rem; border-radius: var(--aq-radius); border-color: var(--aq-border-strong); }
 starlight-theme-select select, starlight-lang-select select { min-height: 2.75rem; }
 
