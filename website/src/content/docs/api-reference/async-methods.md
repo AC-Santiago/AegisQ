@@ -7,13 +7,15 @@ description: Non-blocking encryption and decryption
 
 `AegisCipher` provides `encrypt_async()` and `decrypt_async()` methods that run in a `ThreadPoolExecutor` without blocking the event loop.
 
+These wrappers only offload encryption and decryption. `generate_keypair()` is synchronous; use a worker if generating keys inside an event loop. Cancelling the awaiting task does not guarantee that already-running native work stops or its buffers are erased immediately.
+
 ```python
 import asyncio
 from aegisq import AegisCipher, SecurityLevel
 
 async def main():
     cipher = AegisCipher(level=SecurityLevel.ML_KEM_768)
-    keypair = cipher.generate_keypair()
+    keypair = await asyncio.to_thread(cipher.generate_keypair)
 
     # Non-blocking encryption
     package = await cipher.encrypt_async(
