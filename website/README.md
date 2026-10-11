@@ -150,6 +150,40 @@ Cloudflare tooling is pinned in the frontend lockfile. Use
 from `website/`; do not install a global or unpinned Wrangler. Installing or
 checking the CLI does not deploy anything or change the Workers Free plan.
 
+## Hosting runtime checks and publication gate
+
+After `build:cloudflare`, run `corepack pnpm verify:hosting`. It starts/stops two
+owned local Wrangler emulators on ports 4351/4352 and checks redirects, localized
+HTTP 404, search assets and headers. It never contacts production hosts. For
+Chromium checks, provide an already installed Playwright module and browser:
+
+```bash
+HOSTING_BROWSER=1 PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs \
+CHROMIUM_PATH=/absolute/path/to/chromium corepack pnpm verify:hosting
+```
+
+Run `node scripts/test-cloudflare.mjs` for isolated contract tests: invalid
+dynamic/SPA configs, wrong canonical/home links, absolute locale values and
+indexable errors must fail, while scripts/styles/code samples remain unchanged.
+
+The browser gate checks both locales at mobile/desktop widths, home search
+results reaching docs, native locale/theme controls and recovery to the correct
+home. Reports are ignored under `.impeccable/review/hosting`. The separate Website
+workflow runs builds, dry-runs and this gate on PRs/pushes; it has read-only GitHub
+permissions and no Cloudflare credentials or deploy job. It does not replace the
+library's CI or claim a full accessibility/cross-browser audit.
+
+Production is a separate approval: merge reviewed hosting changes through
+`develop` and then promote them to `main`; verify Workers Free, the active
+`aegisq.dev` Cloudflare zone and existing DNS before writing anything. Configure
+scoped authentication outside Git, deploy the docs config first and the home
+config second, then verify live HTTPS, redirects, search, locale controls and
+unknown-route status before closing issue #81. Custom Domains manage DNS/TLS;
+do not overwrite an existing domain binding blindly. No PyPI tag is required.
+The two deployments are not atomic: on a partial failure, stop and report which
+host changed; use its previous Cloudflare deployment for rollback. This unit
+adds no production trigger, paid-plan change or credentials.
+
 ## Useful Commands
 
 | Command              | Action                                       |

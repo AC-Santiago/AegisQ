@@ -9,6 +9,7 @@
     "build": "astro build",
     "build:cloudflare": "astro build && node scripts/prepare-cloudflare.mjs && node scripts/verify-cloudflare.mjs",
     "verify:cloudflare": "node scripts/verify-cloudflare.mjs",
+    "verify:hosting": "node scripts/verify-cloudflare-runtime.mjs",
     "preview": "astro preview",
     "astro": "astro"
   },
