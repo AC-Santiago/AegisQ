@@ -1,8 +1,10 @@
 # AegisQ
 
-**Post-Quantum Cryptography Engine for Python** · v1.2.0
+**Post-Quantum Cryptography Engine for Python**
 
-AegisQ is a hybrid cryptographic library that combines **ML-KEM** (FIPS 203) for quantum-resistant key encapsulation with **AES-256-GCM** for authenticated symmetric encryption. The cryptographic core is written in Rust for performance and security guarantees, exposed to Python via PyO3.
+AegisQ is a hybrid cryptographic library that combines **ML-KEM** (FIPS 203) for quantum-resistant key encapsulation with **AES-256-GCM** for authenticated symmetric encryption. The cryptographic core is written in Rust and exposed to Python via PyO3.
+
+**Status: Beta.** See [PyPI](https://pypi.org/project/aegisq-pqc/) for published versions and [CHANGELOG.md](CHANGELOG.md) for release history. Checkout versions are declared in the package manifests; `develop` can contain an unpublished prerelease. Algorithm implementation and test-vector coverage do not constitute FIPS certification or an independent security audit.
 
 ```python
 from aegisq import AegisCipher, SecurityLevel
@@ -25,13 +27,13 @@ plaintext = cipher.decrypt(package, keypair.secret_key)
 - **Authenticated encryption** — AES-256-GCM provides confidentiality and integrity in a single operation
 - **Three security levels** — ML-KEM-512 (NIST Level 1), ML-KEM-768 (Level 3, default), ML-KEM-1024 (Level 5)
 - **Rust core, Python API** — Cryptographic operations run in optimized Rust; Python developers get an ergonomic 3-line API
-- **Constant-time operations** — Timing-attack resistant via `subtle::ConstantTimeEq` and Barrett reduction
-- **Memory zeroization** — All secret keys and shared secrets are securely erased after use via `zeroize`
-- **Zero-copy FFI** — Data passes between Python and Rust without unnecessary copies
+- **Timing defenses** — Constant-time capsule comparison and key selection via `subtle`; Barrett reduction in field arithmetic
+- **Scoped memory cleanup** — Explicit zeroization in selected Rust paths; not a guarantee of erasure for every key or Python copy
+- **Borrowed FFI inputs** — Bindings accept byte slices; returned Python bytes and key getters create copies
 - **GIL release** — Rust crypto operations release the Python GIL via `py.detach()`, enabling true parallelism
-- **Type-safe** — Full PEP 561 type stubs with IDE autocompletion support
+- **Type information** — PEP 561 marker and native API stubs; streaming bindings are not yet included in the native stub
 - **Python 3.11+** — Built with PyO3 abi3 stable ABI for broad compatibility (3.11 through 3.13+)
-- **Ephemeral sessions with forward secrecy** — `EphemeralSession` class auto-generates keypairs and destroys secrets on close
+- **Ephemeral sessions** — `EphemeralSession` generates a session keypair and disables access on close; secure erasure and protocol-level forward secrecy are not guaranteed
 - **Async support** — `encrypt_async()` / `decrypt_async()` methods for non-blocking cryptographic operations
 
 ---
@@ -44,17 +46,17 @@ plaintext = cipher.decrypt(package, keypair.secret_key)
 pip install aegisq-pqc
 ```
 
-> **Python 3.11+ required.** The package supports Python 3.11 through 3.13+ via PyO3's stable ABI.
+> **Python 3.11+ required.** A compatible wheel avoids a Rust build; otherwise installation requires a Rust toolchain. The extension targets `abi3-py311`, but wheels remain OS/architecture-specific and future/free-threaded runtimes require separate validation.
 
 ### From source (requires Rust toolchain)
 
 ```bash
-# Prerequisites: Rust (via rustup), Python >= 3.11, maturin
-pip install maturin
-
-# Clone and build
+# Prerequisites: Rust (via rustup), Python >= 3.11
 git clone https://github.com/AC-Santiago/AegisQ.git
 cd AegisQ
+python -m venv .venv
+source .venv/bin/activate  # Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install maturin
 maturin develop --release
 ```
 
@@ -107,7 +109,8 @@ capsule, shared_secret = kem.encapsulate(keypair.public_key)
 
 # Decapsulate: recovers the same 32-byte shared secret
 recovered = kem.decapsulate(capsule, keypair.secret_key)
-assert shared_secret == recovered
+import hmac
+assert hmac.compare_digest(shared_secret, recovered)
 ```
 
 ### Async Operations
@@ -118,7 +121,7 @@ from aegisq import AegisCipher, SecurityLevel
 
 async def main():
     cipher = AegisCipher(level=SecurityLevel.ML_KEM_768)
-    keypair = cipher.generate_keypair()
+    keypair = await asyncio.to_thread(cipher.generate_keypair)
 
     # Non-blocking encryption
     package = await cipher.encrypt_async(
@@ -136,14 +139,14 @@ async def main():
 asyncio.run(main())
 ```
 
-### Ephemeral Sessions (Forward Secrecy)
+### Ephemeral Sessions
 
-The `EphemeralSession` class generates a keypair internally and destroys the secret key when the session closes, providing **forward secrecy**:
+`EphemeralSession` generates a keypair internally. Closing it drops its keypair reference and prevents further operations, but does not guarantee memory erasure. Forward secrecy additionally requires an appropriate authenticated protocol and secure disposal of past keys.
 
 ```python
 from aegisq import EphemeralSession
 
-# Receiver creates an ephemeral session (secret key never leaves this context)
+# Receiver creates a session with no public secret-key getter
 with EphemeralSession() as receiver:
     public_key = receiver.public_key  # Share this with the sender
 
@@ -158,7 +161,7 @@ with EphemeralSession() as receiver:
     # Receiver decrypts
     plaintext = receiver.decrypt(package)
 
-# Session closes, secret key is destroyed
+# Session closes and drops its keypair reference; no complete erasure guarantee
 ```
 
 ---
@@ -189,12 +192,13 @@ class AegisCipher:
     async def decrypt_async(self, encrypted_package: bytes, secret_key: bytes) -> bytes
 ```
 
-### `EphemeralSession` (forward secrecy)
+### `EphemeralSession` (session keypair lifecycle)
 
 ```python
 class EphemeralSession:
     def __init__(self, level: SecurityLevel = SecurityLevel.ML_KEM_768) -> None
-    def public_key(self) -> bytes  # Read-only, secret key never exposed
+    @property
+    def public_key(self) -> bytes  # No public secret-key getter
     def encrypt(self, plaintext: bytes, recipient_public_key: bytes) -> bytes
     def decrypt(self, encrypted_package: bytes) -> bytes
     def close(self) -> None
@@ -209,7 +213,7 @@ class MlKem:
     def generate_keypair(self) -> KeyPair
     def encapsulate(self, public_key: bytes) -> tuple[bytes, bytes]
     def decapsulate(self, capsule: bytes, secret_key: bytes) -> bytes
-    def load_public_key_b64(self, b64: str, level: SecurityLevel = None) -> bytes
+    def load_public_key_b64(self, b64: str, level: SecurityLevel | None = None) -> bytes
 ```
 
 #### Base64 Serialization
@@ -236,9 +240,10 @@ class KeyPair:
 
 ```
 AegisQError(Exception)                          Base exception
-├── DecapsulationError(AegisQError)             ML-KEM structural error (wrong buffer size)
+├── DecapsulationError(AegisQError)             Exported structural error type
 ├── DecryptionError(AegisQError)               AES-GCM auth tag failed (tampered or wrong key)
-├── InvalidParameterError(AegisQError, ValueError)  Incorrect parameter sizes
+├── InvalidParameterError(AegisQError)          Incorrect parameter sizes
+├── KeySerializationError(AegisQError)          Malformed key serialization
 ├── RngError(AegisQError)                      OS CSPRNG unavailable
 └── SessionExpiredError(AegisQError)           Attempted operation on closed EphemeralSession
 ```
@@ -262,7 +267,7 @@ AegisQ is structured in three hermetic layers. Each layer only depends on the on
 │  Type hints, docstrings, developer-facing abstractions       │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 2: FFI Bridge  (crates/aegisq-pyo3/)                 │
-│  PyO3 bindings, GIL release, zero-copy data passing          │
+│  PyO3 bindings, GIL release, borrowed byte-slice inputs      │
 │  No cryptographic logic — pure translation layer             │
 ├─────────────────────────────────────────────────────────────┤
 │  Layer 1: Rust Core   (crates/aegisq-core/)                 │
@@ -308,29 +313,30 @@ pytest tests/python/test_kem_api.py           # MlKem API
 ```bash
 cargo clippy --workspace -- -D warnings   # Rust linter (warnings are errors)
 cargo fmt --all                           # Rust formatting
-ruff check aegisq/                        # Python type checking
+ruff check aegisq/                        # Python linting (not type checking)
 ```
 
 ---
 
 ## Security
 
-### Guarantees
+### Mechanisms and Limits
 
 | Property | Mechanism |
 |----------|-----------|
-| IND-CCA2 security | Implicit rejection in ML-KEM Decaps (FIPS 203 §7.3) |
+| Capsule-validity oracle defense | Implicit rejection in ML-KEM Decaps (FIPS 203 §7.3) |
 | Quantum resistance | M-LWE hardness assumption (ML-KEM) |
 | Data confidentiality + integrity | AES-256-GCM authenticated encryption |
-| Timing attack immunity | `subtle::ConstantTimeEq`, Barrett reduction |
-| Memory scrubbing | `zeroize::Zeroize` on all secrets |
-| Nonce uniqueness | Fresh 96-bit random nonce via `OsRng` per encrypt call |
+| Timing defenses | Constant-time capsule comparison/key selection; not a complete side-channel audit |
+| Scoped memory cleanup | Selected Rust buffers are zeroized; bridge keys and Python copies are not covered completely |
+| Random one-shot nonces | Fresh 96-bit OS-random nonce per encrypt call; uniqueness is probabilistic |
 | Integer overflow protection | `overflow-checks = true` in release profile |
 
 ### Important Notes
 
-- **No forward secrecy by default.** If a secret key is compromised, all payloads encrypted to that key are compromised. **Mitigation:** Use ephemeral keypairs — generate a new keypair per session and discard the secret key after decryption.
-- **ML-KEM Decaps never raises an error for invalid capsules** (implicit rejection). Instead, it returns a pseudorandom key, which causes AES-GCM to fail with `DecryptionError`. This prevents chosen-ciphertext oracle attacks.
+- **No forward-secrecy guarantee.** A compromised secret key permits decryption of recorded payloads addressed to it. Independent session keys reduce key reuse, but `EphemeralSession.close()` is not a secure-erasure guarantee.
+- **Implicit rejection applies to invalid contents of correctly sized capsules.** Decaps returns a pseudorandom key; AES-GCM authentication is expected to fail with `DecryptionError`. Incorrect key/capsule sizes raise `InvalidParameterError` in the current implementation.
+- **No sender-identity or replay protection.** Authenticate public keys and enforce protocol-level replay protection separately.
 - **AES-GCM tag failure always raises `DecryptionError`.** Unlike ML-KEM's silent rejection, a failed auth tag means the payload was tampered with or the wrong key was used.
 
 ---
@@ -344,15 +350,18 @@ ruff check aegisq/                        # Python type checking
 
 ### Dependencies
 
+The table summarizes current manifest requirements, not exact resolved versions or a historical release. See [Cargo.toml](Cargo.toml), the [bridge manifest](crates/aegisq-pyo3/Cargo.toml), and `Cargo.lock` for the complete inventory.
+
 | Crate | Version | Purpose |
 |-------|---------|---------|
-| `aes-gcm` | 0.10 | AES-256-GCM authenticated encryption (no_std, hardware AES-NI) |
-| `sha3` | 0.11 | SHAKE-128/256 and SHA3-256/512 for ML-KEM (no_std) |
-| `zeroize` | 1.8 | Secure memory erasure of secrets |
+| `aes-gcm` | 0.11 | AES-256-GCM authenticated encryption (no_std) |
+| `sha3` | 0.12 | SHA3-256/512 for ML-KEM (no_std) |
+| `shake` | 0.1 | SHAKE-128/256 for ML-KEM (no_std) |
+| `zeroize` | 1.9 | Cleanup of selected secret buffers |
 | `subtle` | 2.6 | Constant-time comparisons |
 | `getrandom` | 0.4 | Cross-platform CSPRNG (no_std) |
-| `pyo3` | 0.28 | Rust-Python FFI bindings (abi3-py311) |
+| `pyo3` | 0.29 | Rust-Python FFI bindings (abi3-py311) |
 
 ---
 
-For complete technical documentation including the mathematical foundation, algorithm specifications, and security model details, see [DOCUMENTATION.md](DOCUMENTATION.md).
+Canonical public documentation is maintained in [website/src/content/docs/](website/src/content/docs/) in English and Spanish. Start with [installation](website/src/content/docs/getting-started/installation.mdx), the [API reference](website/src/content/docs/api-reference/aegiscipher.md), and the [security model](website/src/content/docs/internals/security-model.md). [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md) is retained as historical documentation, not the current API reference.
