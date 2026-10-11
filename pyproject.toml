@@ -38,9 +38,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage   = "https://github.com/AC-Santiago/AegisQ"
-Repository = "https://github.com/AC-Santiago/AegisQ.git"
-Issues     = "https://github.com/AC-Santiago/AegisQ/issues"
+Homepage      = "https://aegisq.dev"
+Documentation = "https://docs.aegisq.dev"
+Repository    = "https://github.com/AC-Santiago/AegisQ.git"
+Issues        = "https://github.com/AC-Santiago/AegisQ/issues"
 
 [tool.maturin]
 manifest-path = "crates/aegisq-pyo3/Cargo.toml"

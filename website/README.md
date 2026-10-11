@@ -2,26 +2,35 @@
 
 [![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://python.org)
-[![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)](https://rustup.rs/)
 
 Documentation site for **AegisQ** — a post-quantum cryptographic library for Python.
+
+Published homepage: https://aegisq.dev · Documentation: https://docs.aegisq.dev
+
+The sites use Cloudflare Workers Static Assets and Custom Domains on Workers
+Free. Cloudflare manages DNS/TLS; the VPS is a build/deployment client, not an
+origin. GitHub CI validates changes but **does not publish them**.
 
 AegisQ combines ML-KEM (FIPS 203) for quantum-resistant key encapsulation with AES-256-GCM for authenticated symmetric encryption. The cryptographic core is written in Rust, exposed to Python via PyO3.
 
 ## Quick Start
 
+From the repository root:
+
 ```bash
+cd website
+
 # Install dependencies
-pnpm install
+corepack pnpm install --frozen-lockfile
 
 # Start local dev server at localhost:4321
-pnpm dev
+corepack pnpm dev
 
 # Build for production
-pnpm build
+corepack pnpm build
 
 # Preview production build locally
-pnpm preview
+corepack pnpm preview
 ```
 
 ## Project Structure
@@ -35,7 +44,7 @@ website/
 │   ├── components/      # Native Starlight wrappers and accessibility enhancements
 │   ├── pages/           # Custom bilingual 404 routes using the Starlight shell
 │   ├── scripts/         # Progressive reading-motion enhancement
-│   ├── styles/          # Chromatic Index tokens, themes, and restrained motion
+│   ├── styles/          # Paper/forest tokens, themes, and restrained motion
 │   ├── content/
 │   │   └── docs/        # Markdown/MDX documentation files
 │   └── content.config.ts
@@ -48,11 +57,10 @@ Documentation lives in `src/content/docs/` as `.md` or `.mdx` files. Starlight a
 
 ## Frontend design and verification
 
-The Chromatic Index frame keeps Starlight's search, language selector, theme
+The paper/forest frame keeps Starlight's search, language selector, theme
 selector, mobile navigation, and generated contents. It adds localized chapter
 navigation and self-hosted Schibsted Grotesk; font sources and the OFL license
-are in `public/fonts/`. The library runtime and frontend dependencies are
-unchanged.
+are in `public/fonts/`.
 
 The shared theme lives in `src/styles/docs.css`. A small
 `src/scripts/reading-motion.ts` enhancement uses one IntersectionObserver for
@@ -141,9 +149,9 @@ use the nearest English/Spanish `404.html` with HTTP 404, not SPA fallback.
 Only static assets are configured: no Worker script, bindings, SSR or paid
 resources. The verifier rejects unexpected config fields and checks Workers
 Free limits (20,000 files and 25 MiB per asset). It does not inspect account
-billing; confirm Workers Free before a separately approved production deployment.
-Removing the packaging scripts/configs and restoring the prior site URL/scripts
-rolls back this build-only unit without changing library code or existing DNS.
+billing; confirm Workers Free before an approved production deployment. Removing
+the local packaging scripts/configs does not roll back an existing deployment
+or its DNS bindings.
 
 Cloudflare tooling is pinned in the frontend lockfile. Use
 `corepack pnpm install --frozen-lockfile` and `corepack pnpm exec wrangler --version`
@@ -173,16 +181,37 @@ workflow runs builds, dry-runs and this gate on PRs/pushes; it has read-only Git
 permissions and no Cloudflare credentials or deploy job. It does not replace the
 library's CI or claim a full accessibility/cross-browser audit.
 
-Production is a separate approval: merge reviewed hosting changes through
-`develop` and then promote them to `main`; verify Workers Free, the active
-`aegisq.dev` Cloudflare zone and existing DNS before writing anything. Configure
-scoped authentication outside Git, deploy the docs config first and the home
-config second, then verify live HTTPS, redirects, search, locale controls and
-unknown-route status before closing issue #81. Custom Domains manage DNS/TLS;
-do not overwrite an existing domain binding blindly. No PyPI tag is required.
-The two deployments are not atomic: on a partial failure, stop and report which
-host changed; use its previous Cloudflare deployment for rollback. This unit
-adds no production trigger, paid-plan change or credentials.
+### Update the published sites
+
+Production updates require separate approval. Merge reviewed changes through
+`develop` and promote them to `main`; build from that reviewed source. Confirm
+Workers Free, the correct account, the active `aegisq.dev` zone and the expected
+existing DNS/Worker domain bindings before writing anything. Keep scoped
+authentication outside Git. Use device authorization on a headless VPS; never
+paste tokens into chat or commit them.
+
+After the build, contract tests, dry-runs and runtime checks above pass, deploy
+from `website/` in this order:
+
+```bash
+corepack pnpm exec wrangler deploy --config wrangler.docs.json
+# Verify docs HTTPS, redirects, bilingual search, theme/locale controls and HTTP 404.
+# Continue only after documentation verification passes.
+corepack pnpm exec wrangler deploy --config wrangler.home.json
+# Verify the same home checks and navigation between both live hosts.
+```
+
+Custom Domains manage DNS/TLS; do not replace expected bindings or unrelated DNS
+records blindly. No PyPI tag or library version bump is required for a docs update.
+Cloudflare may inject its Web Analytics beacon into live HTML; distinguish that
+edge behavior from authored assets when comparing content. Local emulators do
+not establish live DNS/TLS or account billing state.
+
+The two deployments are not atomic. Record each Worker's previous deployment
+before updating. On a partial failure, stop and report which host changed; use
+that Worker's previous deployment for rollback. A newly created Worker has no
+previous version to restore: report the partial state instead of claiming a
+rollback succeeded. Do not delete Workers or DNS records without approval.
 
 ## Useful Commands
 
