@@ -19,7 +19,7 @@ keypair = cipher_bob.generate_keypair()
 # 2. El emisor cifra con la clave pública del receptor
 cipher_alice = AegisCipher(level=SecurityLevel.ML_KEM_768)
 encrypted_package = cipher_alice.encrypt(
-    plaintext=b"Registros médicos ultra secretos",
+    plaintext="Registros médicos ultra secretos".encode("utf-8"),
     recipient_public_key=keypair.public_key,
 )
 # encrypted_package es un único objeto bytes:
@@ -30,7 +30,7 @@ decrypted = cipher_bob.decrypt(
     encrypted_package=encrypted_package,
     secret_key=keypair.secret_key,
 )
-assert decrypted == b"Registros médicos ultra secretos"
+assert decrypted == "Registros médicos ultra secretos".encode("utf-8")
 ```
 
 ## Operaciones KEM Crudas (Avanzado)
@@ -48,7 +48,8 @@ capsule, shared_secret = kem.encapsulate(keypair.public_key)
 
 # Desencapsular: recupera el mismo shared secret de 32 bytes
 recovered = kem.decapsulate(capsule, keypair.secret_key)
-assert shared_secret == recovered
+import hmac
+assert hmac.compare_digest(shared_secret, recovered)
 ```
 
 ## ¿Qué Pasa Internamente?
