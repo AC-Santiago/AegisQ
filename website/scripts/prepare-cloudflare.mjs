@@ -35,13 +35,16 @@ function route(value, file, target) {
   if (!value || value.startsWith('#')) return value;
   const url = new URL(value.replaceAll('&amp;', '&'), docs + pagePath(file));
   if (![home, docs].includes(url.origin)) return value;
-  if (url.pathname === '/sitemap-index.xml') return '/sitemap.xml';
+  if (/^\/(next\/)?sitemap-index\.xml$/.test(url.pathname)) return '/sitemap.xml';
   // Assets stay same-origin; both bundles contain their immutable dependencies.
   if (/\.[^/]+$/.test(url.pathname) && !url.pathname.endsWith('.html')) return value;
-  const landing = ['/', '/es', '/es/'].includes(url.pathname);
+  const channelBase = url.pathname.startsWith('/next/') ? '/next' : '';
+  const localPath = url.pathname.slice(channelBase.length);
+  const landing = ['/', '/es', '/es/'].includes(localPath);
+  if (landing) url.pathname = localPath; // Both channels recover the same localized homepage.
   if (landing && url.pathname === '/es') url.pathname = '/es/';
   const error = /\/404(?:\.html)?\/?$/.test(url.pathname);
-  if (error) url.pathname = url.pathname.startsWith('/es/') ? '/es/404/' : '/404.html';
+  if (error) url.pathname = channelBase + (localPath.startsWith('/es/') ? '/es/404/' : '/404.html');
   url.host = new URL(error ? (target === 'home' ? home : docs) : landing ? home : docs).host;
   return url.href.replaceAll('&', '&amp;');
 }
@@ -66,6 +69,7 @@ for (const target of ['home', 'docs']) {
   const pages = [];
   for (const file of sourceFiles) {
     if (file.startsWith('sitemap') || file === 'robots.txt') continue;
+    if (target === 'home' && file.startsWith('next/')) continue;
     const isHtml = file.endsWith('.html');
     const isError = /(?:^|\/)404(?:\/index)?\.html$/.test(file);
     if (isHtml && !isError && (target === 'home') !== landings.has(file)) continue;
@@ -78,8 +82,9 @@ for (const target of ['home', 'docs']) {
   }
   // Cloudflare selects the nearest 404.html for the requested path.
   await cp(path.join(directory, 'es/404/index.html'), path.join(directory, 'es/404.html'));
+  if (target === 'docs') await cp(path.join(directory, 'next/es/404/index.html'), path.join(directory, 'next/es/404.html'));
   const origin = target === 'home' ? home : docs;
-  const urls = pages.map((file) => {
+  const urls = pages.filter((file) => !file.startsWith('next/')).map((file) => {
     const pathname = pagePath(file);
     const alternate = pathname.startsWith('/es/') ? pathname.slice(3) : `/es${pathname}`;
     return `<url><loc>${origin}${pathname}</loc><xhtml:link rel="alternate" hreflang="en" href="${origin}${pathname.startsWith('/es/') ? alternate : pathname}"/><xhtml:link rel="alternate" hreflang="es" href="${origin}${pathname.startsWith('/es/') ? pathname : alternate}"/></url>`;
@@ -89,13 +94,18 @@ for (const target of ['home', 'docs']) {
   await writeFile(path.join(directory, 'robots.txt'),
     `User-agent: *\nAllow: /\nDisallow: /404\nDisallow: /es/404\nSitemap: ${origin}/sitemap.xml\n`);
   const redirects = target === 'docs'
-    ? ['/ /getting-started/installation/ 302', '/es /es/getting-started/installation/ 302', '/es/ /es/getting-started/installation/ 302']
+    ? ['', '/next'].flatMap((base) => [
+      `${base || '/'} ${base}/getting-started/installation/ 302`,
+      `${base}/es ${base}/es/getting-started/installation/ 302`,
+      `${base}/es/ ${base}/es/getting-started/installation/ 302`,
+      ...(base ? [`${base}/ ${base}/getting-started/installation/ 302`] : []),
+    ])
     : sections.flatMap((section) => [
       `/${section}/* ${docs}/${section}/:splat 301`,
       `/es/${section}/* ${docs}/es/${section}/:splat 301`,
-    ]);
+    ]).concat([`/next ${docs}/next/ 301`, `/next/* ${docs}/next/:splat 301`]);
   await writeFile(path.join(directory, '_redirects'), redirects.join('\n') + '\n');
   await writeFile(path.join(directory, '_headers'),
     '/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n/_astro/*\n  Cache-Control: public, max-age=31536000, immutable\n');
-  console.log(`${target}: ${pages.length} indexable pages packaged for ${origin}`);
+  console.log(`${target}: ${pages.length} pages (${urls.length} indexable) packaged for ${origin}`);
 }

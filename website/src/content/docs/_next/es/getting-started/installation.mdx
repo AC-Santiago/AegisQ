@@ -1,0 +1,28 @@
+---
+title: Instalación de desarrollo
+description: Compilar la rama de desarrollo de AegisQ, separada de la versión estable de PyPI.
+---
+
+Este canal documenta **1.6.0-rc1** en desarrollo. No es la versión estable de PyPI
+y no tiene un compromiso de soporte estable. Para instalaciones estables, use
+el selector de versión de arriba.
+
+## Compilar desde el código fuente
+
+Use Python 3.11 o posterior y un toolchain estable de Rust. Instale `uv` y compile
+la rama de desarrollo seleccionada explícitamente:
+
+```bash
+git clone --branch develop https://github.com/AC-Santiago/AegisQ.git
+cd AegisQ
+uv sync --dev
+uv run maturin develop --release
+```
+
+`uv sync --dev` puede actualizar el lockfile del checkout. La extensión nativa usa
+`abi3-py311`; esto no demuestra compatibilidad con todo runtime futuro de Python
+ni con compilaciones free-threaded.
+
+Continúe con la [guía rápida](/es/getting-started/quickstart/). Los ejemplos de
+desarrollo pueden cambiar antes del release. Esta página no afirma que exista
+una prerelease disponible en PyPI o TestPyPI.

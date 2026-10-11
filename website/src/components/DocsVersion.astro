@@ -1,0 +1,24 @@
+---
+import { channel, channels, documentationPath } from '../docs-channels.mjs';
+const isSpanish = Astro.locals.starlightRoute.locale === 'es';
+---
+<label class="aq-doc-version">
+	<span class="sr-only">{isSpanish ? 'Versión de documentación' : 'Documentation version'}</span>
+	<select aria-label={isSpanish ? 'Versión de documentación' : 'Documentation version'}>
+		<option value={documentationPath(Astro.url.pathname, 'stable')} selected={channel === 'stable'}>{channels.stable.version} · {isSpanish ? 'Estable' : 'Stable'}</option>
+		<option value={documentationPath(Astro.url.pathname, 'next')} selected={channel === 'next'}>{channels.next.version} · {isSpanish ? 'Desarrollo' : 'Development'}</option>
+	</select>
+</label>
+<noscript>
+	<a href={documentationPath(Astro.url.pathname, 'stable')}>{isSpanish ? 'Estable' : 'Stable'}</a>
+	<a href={documentationPath(Astro.url.pathname, 'next')}>{isSpanish ? 'Desarrollo' : 'Development'}</a>
+</noscript>
+<script>
+	for (const select of document.querySelectorAll<HTMLSelectElement>('.aq-doc-version select')) {
+		select.addEventListener('change', () => { location.href = select.value + location.hash; });
+	}
+</script>
+<style>
+	.aq-doc-version { position: sticky; inset-inline-start: 0; z-index: 1; display: flex; flex-shrink: 0; align-items: center; background: var(--aq-band-bg); }
+	select { max-width: 11rem; min-height: 2.75rem; padding: 0.25rem; border: 1px solid var(--aq-band-text); border-radius: var(--aq-radius); color: inherit; background: var(--aq-band-bg); font: inherit; font-size: 0.8125rem; }
+</style>

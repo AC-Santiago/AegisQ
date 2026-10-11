@@ -1,5 +1,6 @@
 ---
-const { siteTitleHref, locale, hasSidebar } = Astro.locals.starlightRoute;
+const { locale, hasSidebar } = Astro.locals.starlightRoute;
+const siteTitleHref = locale === 'es' ? '/es/' : '/';
 ---
 
 <a class="aq-site-title" href={siteTitleHref}>
