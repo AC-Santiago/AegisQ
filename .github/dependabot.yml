@@ -1,43 +1,98 @@
 version: 2
 
+# GitHub reads this file from the default branch (main).
+# target-branch routes version updates only; security updates still target main.
 updates:
-  # ── Dependencias de GitHub Actions ─────────────────────────────────────────
+  # Keep action upgrades separate so workflow changes can be reviewed individually.
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "develop"
+    open-pull-requests-limit: 5
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
       timezone: "America/Bogota"
     labels:
-      - "dependencies"
-      - "github-actions"
+      - "type:chore"
     commit-message:
       prefix: "ci(deps)"
 
-  # ── Dependencias de Cargo (Rust) ────────────────────────────────────────────
+  # Group only crypto and bridge patches; other upgrades remain individual.
   - package-ecosystem: "cargo"
     directory: "/"
+    target-branch: "develop"
+    open-pull-requests-limit: 5
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
       timezone: "America/Bogota"
     labels:
-      - "dependencies"
-      - "rust"
+      - "type:chore"
     commit-message:
       prefix: "build(deps)"
-    # Agrupar todas las actualizaciones de crates de RustCrypto en un solo PR
     groups:
       rust-crypto:
         patterns:
           - "aes-gcm"
           - "sha3"
+          - "shake"
           - "zeroize"
           - "subtle"
-          - "rand_core"
-          - "thiserror"
+          - "getrandom"
+        update-types:
+          - "patch"
       pyo3:
         patterns:
-          - "pyo3"
+          - "pyo3*"
+        update-types:
+          - "patch"
+
+  # Python development tools; maturin remains a separate build-tool update.
+  - package-ecosystem: "uv"
+    directory: "/"
+    target-branch: "develop"
+    open-pull-requests-limit: 5
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Bogota"
+    labels:
+      - "type:chore"
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      python-tooling:
+        patterns:
+          - "pytest"
+          - "pytest-asyncio"
+          - "ruff"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # pnpm uses the npm ecosystem; major upgrades remain individual PRs.
+  - package-ecosystem: "npm"
+    directory: "/website"
+    target-branch: "develop"
+    open-pull-requests-limit: 5
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Bogota"
+    labels:
+      - "type:chore"
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      astro:
+        patterns:
+          - "astro"
+          - "@astrojs/starlight"
+          - "@astrojs/check"
+        update-types:
+          - "minor"
+          - "patch"

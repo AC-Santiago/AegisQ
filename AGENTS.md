@@ -253,3 +253,41 @@ El job `check-branch`, step `verify-rc`, exige que exista un tag RC de la misma
 versión base. No comprueba que TestPyPI haya publicado correctamente: esa
 verificación sigue siendo responsabilidad del mantenedor. No saltarse el RC ni
 crear tags/publicaciones como efecto secundario de cambios de documentación.
+
+### 12.6 Mantenimiento de dependencias
+
+`.github/dependabot.yml` cubre Cargo, GitHub Actions, herramientas Python con
+`uv` y la web con pnpm mediante el ecosistema `npm`. Las actualizaciones de
+versión apuntan a `develop`; los cambios de configuración deben llegar también
+a `main`, porque GitHub lee el archivo desde la rama predeterminada. No asumir
+que un merge a `develop` ya activó la configuración.
+
+1. Clasificar el PR: actualización normal, migración incompatible o corrección
+   de vulnerabilidad. Comprobar si el cambio ya está en los manifiestos y
+   lockfiles de las ramas actuales antes de integrarlo o cerrarlo.
+2. Revisar notas upstream, dependencias transitivas, licencias, features y
+   requisitos de compilador/runtime. Los grupos reducen ruido, no sustituyen
+   la revisión: criptografía, RNG y bridge requieren revisión manual incluso
+   en parches; un incremento menor en una dependencia `0.x` puede ser incompatible.
+3. Validar el cambio contra la base actual con lockfiles respetados: Rust con
+   `--locked`, Python con `uv sync --locked --dev` y web con el comando de
+   instalación `--frozen-lockfile` de `website/README.md`. Ejecutar los checks
+   pertinentes de la sección 7, auditorías y regresiones; si cambia Criterion,
+   compilar y ejecutar los benchmarks en modo de prueba. Si cambia una Action,
+   revisar todos los workflows afectados, no solo el resultado de CI histórico.
+4. Si el bump necesita cambios de código, preparar un PR manual desde `develop`
+   que incluya actualización, migración y pruebas. Enlazar el PR sustituto antes
+   de cerrar el del bot. No aplicar un ignore permanente para limpiar la cola.
+5. Exigir CI actual y aprobación antes del squash merge. No habilitar automerge
+   general para criptografía. Llevar las actualizaciones del paquete a producción
+   mediante el flujo RC/release de la sección 12.5; la web mantiene aprobación
+   de despliegue independiente.
+
+Las alertas y actualizaciones de seguridad se habilitan en los ajustes de GitHub,
+no por añadir `dependabot.yml`. Los PR de seguridad siempre apuntan a la rama
+predeterminada: atenderlos con prioridad mediante una corrección mínima aprobada,
+respetar el flujo de hotfix/release cuando afecte al paquete publicado y llevar
+el arreglo también a `develop`. Cambiar ajustes de seguridad, protecciones o
+excepciones de auditoría requiere aprobación explícita; un fallo de auditoría
+no se resuelve suprimiéndolo ni interpretando un servicio desactivado como cero
+vulnerabilidades.
