@@ -97,6 +97,36 @@ controls. Publication remains manual with separate approval.
 
 ## Frontend design and verification
 
+### Brand icons
+
+`public/favicon.svg` is the canonical web icon, normalized from the maintainer's
+`ESCUDO-20261018-172315-e579a7e1.svg` artwork. It preserves the shield, Q tail,
+and rounded strokes on a padded square canvas. The original forest `#365d51`
+changes to mint `#8fc4a8` for dark browser/OS preferences; this is independent
+of Starlight's in-page theme selector.
+
+After editing the SVG, regenerate the committed raster fallbacks from `website/`:
+
+```bash
+corepack pnpm icons:build
+corepack pnpm build:cloudflare
+```
+
+The existing locked Sharp dependency generates `public/favicon.ico` (16/32/48 px)
+and `public/apple-touch-icon.png` (180 px). Both use forest on opaque paper so
+they remain visible without SVG dark-mode support. No new dependency is needed.
+`astro.config.mjs` declares channel-aware links and a forest browser theme color;
+Starlight's SVG favicon stays last to prefer it when supported. Packaging carries
+the icons to both domains and `/next/`. `scripts/test-icons.mjs`, included in
+`build:cloudflare`, checks regeneration, ICO payloads and links on every packaged
+HTML page, including EN/ES errors. Hosting checks request every icon over local
+HTTP; with `HOSTING_BROWSER=1`, Chromium also checks both SVG paths' fill and
+stroke in light/dark on both domains and channels. Builds only validate:
+publication still requires independent approval. The header wordmark and public
+routes are unchanged.
+
+### Layout and browser checks
+
 The paper/forest frame keeps Starlight's search, language selector, theme
 selector, mobile navigation, and generated contents. It adds localized chapter
 navigation and self-hosted Schibsted Grotesk; font sources and the OFL license
