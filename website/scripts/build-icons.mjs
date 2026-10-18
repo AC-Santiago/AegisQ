@@ -7,12 +7,13 @@ const publicDirectory = fileURLToPath(new URL('../public/', import.meta.url));
 
 export async function buildIcons() {
   const source = await readFile(path.join(publicDirectory, 'favicon.svg'), 'utf8');
-  // Raster fallbacks use the original forest color on opaque paper in any theme.
+  // Preserve the artwork's transparency; do not add a background to mobile icons.
+  // Raster fallbacks use the original forest color in any theme.
   // Only the browser-rendered SVG follows the browser/OS color preference.
   const light = Buffer.from(source.replace(/<style>[\s\S]*?<\/style>/, ''));
   const render = (size) => sharp(light, { density: 144 })
     .resize(size, size)
-    .flatten({ background: '#f7f9f8' })
+    .ensureAlpha()
     .png()
     .toBuffer();
 
@@ -28,7 +29,7 @@ export async function buildIcons() {
     directory[entry] = size;
     directory[entry + 1] = size;
     directory.writeUInt16LE(1, entry + 4); // Color planes.
-    directory.writeUInt16LE(24, entry + 6); // Opaque RGB PNG: 8 bits per channel.
+    directory.writeUInt16LE(32, entry + 6); // RGBA PNG: 8 bits per channel.
     directory.writeUInt32LE(images[index].length, entry + 8);
     directory.writeUInt32LE(offset, entry + 12);
     offset += images[index].length;

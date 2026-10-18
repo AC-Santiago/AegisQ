@@ -18,8 +18,9 @@ export default defineConfig({
 			disable404Route: true,
 			favicon: '/favicon.svg',
 			head: [
-				{ tag: 'link', attrs: { rel: 'icon', href: `${currentChannel.base}favicon.ico`, sizes: '16x16 32x32 48x48' } },
-				{ tag: 'link', attrs: { rel: 'apple-touch-icon', href: `${currentChannel.base}apple-touch-icon.png`, sizes: '180x180' } },
+				// Refresh cached opaque raster icons without changing stable asset paths.
+				{ tag: 'link', attrs: { rel: 'icon', href: `${currentChannel.base}favicon.ico?v=2`, sizes: '16x16 32x32 48x48' } },
+				{ tag: 'link', attrs: { rel: 'apple-touch-icon', href: `${currentChannel.base}apple-touch-icon.png?v=2`, sizes: '180x180' } },
 				{ tag: 'meta', attrs: { name: 'theme-color', content: '#365d51' } },
 				...(channel === 'next' ? [{ tag: /** @type {'meta'} */ ('meta'), attrs: { name: 'robots', content: 'noindex, follow' } }] : []),
 			],

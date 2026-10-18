@@ -1,9 +1,13 @@
 ---
 const { locale, hasSidebar } = Astro.locals.starlightRoute;
 const siteTitleHref = locale === 'es' ? '/es/' : '/';
+const logoUrl = `${import.meta.env.BASE_URL}favicon.svg`;
 ---
 
 <a class="aq-site-title" href={siteTitleHref}>
-	<span translate="no">AegisQ</span>
+	<span class="aq-site-wordmark">
+		<span class="aq-site-mark" aria-hidden="true" style={`--aq-mark-url: url("${logoUrl}")`}></span>
+		<span translate="no">AegisQ</span>
+	</span>
 	{hasSidebar && <span class="aq-site-label">{locale === 'es' ? 'Documentación' : 'Documentation'}</span>}
 </a>
