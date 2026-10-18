@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import sharp from 'sharp';
 
 const website = fileURLToPath(new URL('../', import.meta.url));
 const ports = { home: 4351, docs: 4352 };
@@ -13,6 +14,41 @@ let browser;
 let responses = 0;
 const layouts = [];
 const iconThemes = [];
+const headerMarks = [];
+
+async function checkHeaderMark(page) {
+  const mark = page.locator('.aq-site-mark');
+  assert.equal(await mark.getAttribute('aria-hidden'), 'true');
+  const metrics = await mark.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const text = element.nextElementSibling.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      width: rect.width, height: rect.height,
+      gap: text.left - rect.right,
+      centerOffset: (rect.top + rect.height / 2) - (text.top + text.height / 2),
+      color: style.backgroundColor, mask: style.maskImage,
+      theme: document.documentElement.dataset.theme,
+    };
+  });
+  assert.equal(metrics.width, 28);
+  assert.equal(metrics.height, 28);
+  assert(metrics.gap >= 7 && metrics.gap <= 9, 'Place the shield immediately left of AegisQ');
+  assert(Math.abs(metrics.centerOffset) <= 1, 'Vertically center the shield and wordmark');
+  const base = new URL(page.url()).pathname.startsWith('/next/') ? '/next/' : '/';
+  assert(metrics.mask.includes(`${base}favicon.svg`), 'Use the channel-aware shared artwork');
+  assert.equal(metrics.color, metrics.theme === 'dark' ? 'rgb(166, 207, 184)' : 'rgb(49, 94, 80)');
+  const { data, info } = await sharp(await mark.screenshot({ animations: 'disabled' }))
+    .removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const rgb = metrics.color.match(/\d+/g).map(Number);
+  let painted = 0;
+  for (let index = 0; index < data.length; index += info.channels) {
+    if (data[index] === rgb[0] && data[index + 1] === rgb[1] && data[index + 2] === rgb[2]) painted++;
+  }
+  assert(painted > info.width * info.height * 0.15 && painted < info.width * info.height * 0.75,
+    'The rendered mask must show a shield, not an invisible mark or solid square');
+  headerMarks.push({ width: page.viewportSize().width, path: new URL(page.url()).pathname, theme: metrics.theme });
+}
 
 function stopServers() {
   for (const server of servers) {
@@ -127,7 +163,7 @@ try {
     }
     for (const width of [320, 375, 768, 1440]) {
       for (const language of ['en', 'es']) {
-        const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+        const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce', colorScheme: 'light' });
         const unexpected = [];
         const errors = [];
         // Intercept every HTTP request: production hosts are simulated, never fetched.
@@ -158,6 +194,7 @@ try {
         await page.evaluate(() => document.fonts.ready);
         assert(await page.locator('.aq-landing').isVisible());
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+        await checkHeaderMark(page);
         assert.equal(await page.locator('link[rel=canonical]').getAttribute('href'), origins.home + prefix);
         await page.locator('site-search button[data-open-modal]').click();
         await page.locator('.pagefind-ui__search-input').fill('AegisCipher');
@@ -174,11 +211,13 @@ try {
         // storage and locale navigation; the emulator redirect changes origin.
         await page.goto(origins.docs + new URL(page.url()).pathname, { waitUntil: 'networkidle' });
         assert(await page.locator('.aq-chapters').isVisible());
+        await checkHeaderMark(page);
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
         if (width < 800) await page.locator('starlight-menu-button button').click();
         const theme = page.locator('starlight-theme-select select:visible').first();
         await theme.selectOption('dark');
         assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
+        await checkHeaderMark(page);
         const locale = page.locator('starlight-lang-select select:visible').first();
         const alternate = origins.docs + (language === 'es' ? '/api-reference/aegiscipher/' : '/es/api-reference/aegiscipher/');
         await locale.selectOption(new URL(alternate).pathname);
@@ -190,6 +229,7 @@ try {
         await page.waitForURL(`${origins.docs}/next${new URL(alternate).pathname}#generate_keypair`);
         await page.waitForLoadState('networkidle');
         assert.equal(await page.locator('[data-doc-channel]').getAttribute('data-doc-channel'), 'next');
+        await checkHeaderMark(page);
         assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark');
         await page.locator('site-search button[data-open-modal]').click();
         await page.locator('.pagefind-ui__search-input').fill('AegisCipher');
@@ -212,6 +252,7 @@ try {
         await page.waitForURL(origins.home + prefix);
         await page.waitForLoadState('networkidle');
         assert(await page.locator('.aq-landing').isVisible());
+        await checkHeaderMark(page);
         assert.deepEqual(errors, []);
         assert.deepEqual(unexpected, []);
         layouts.push({ width, language, search: 'isolated stable/next', locale: 'switched in both channels', versions: 'round trip', homeRecovery: 'passed' });
@@ -220,7 +261,7 @@ try {
       }
     }
   }
-  const result = { responses, browser: browser ? 'Chromium' : 'not requested', iconThemes, cases: layouts };
+  const result = { responses, browser: browser ? 'Chromium' : 'not requested', iconThemes, headerMarks, cases: layouts };
   const output = path.resolve(process.env.UI_QA_DIR || path.join(website, '../.impeccable/review/hosting'));
   await mkdir(output, { recursive: true });
   await writeFile(path.join(output, `hosting-${browser ? 'browser' : 'http'}-report.json`), JSON.stringify(result, null, 2));
