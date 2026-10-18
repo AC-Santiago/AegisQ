@@ -16,7 +16,13 @@ export default defineConfig({
 		starlight({
 			title: 'AegisQ',
 			disable404Route: true,
-			head: channel === 'next' ? [{ tag: 'meta', attrs: { name: 'robots', content: 'noindex, follow' } }] : [],
+			favicon: '/favicon.svg',
+			head: [
+				{ tag: 'link', attrs: { rel: 'icon', href: `${currentChannel.base}favicon.ico`, sizes: '16x16 32x32 48x48' } },
+				{ tag: 'link', attrs: { rel: 'apple-touch-icon', href: `${currentChannel.base}apple-touch-icon.png`, sizes: '180x180' } },
+				{ tag: 'meta', attrs: { name: 'theme-color', content: '#365d51' } },
+				...(channel === 'next' ? [{ tag: /** @type {'meta'} */ ('meta'), attrs: { name: 'robots', content: 'noindex, follow' } }] : []),
+			],
 			customCss: ['./src/styles/docs.css'],
 			components: {
 				Header: './src/components/DocsHeader.astro',
