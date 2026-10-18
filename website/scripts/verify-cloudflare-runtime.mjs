@@ -12,6 +12,7 @@ const servers = [];
 let browser;
 let responses = 0;
 const layouts = [];
+const iconThemes = [];
 
 function stopServers() {
   for (const server of servers) {
@@ -83,6 +84,10 @@ try {
     await request(target, '/sitemap.xml', 200);
     await request(target, '/robots.txt', 200);
     await request(target, '/pagefind/pagefind.js', 200);
+    for (const name of ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png']) {
+      await request(target, `/${name}`, 200);
+      if (target === 'docs') await request(target, `/next/${name}`, 200);
+    }
     const headers = await fetch(`http://127.0.0.1:${ports[target]}/404.html`);
     assert.equal(headers.headers.get('x-content-type-options'), 'nosniff');
   }
@@ -104,6 +109,22 @@ try {
   if (process.env.HOSTING_BROWSER === '1') {
     const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
     browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH, headless: true });
+    for (const target of ['home', 'docs']) {
+      for (const base of target === 'docs' ? ['/', '/next/'] : ['/']) {
+        for (const colorScheme of ['light', 'dark']) {
+          const context = await browser.newContext({ colorScheme });
+          const page = await context.newPage();
+          await page.goto(`${localOrigins[target]}${base}favicon.svg`);
+          const colors = await page.locator('svg path').evaluateAll((paths) => paths.map((path) => ({
+            fill: getComputedStyle(path).fill, stroke: getComputedStyle(path).stroke,
+          })));
+          const expected = colorScheme === 'dark' ? 'rgb(143, 196, 168)' : 'rgb(54, 93, 81)';
+          assert.deepEqual(colors, Array.from({ length: 2 }, () => ({ fill: expected, stroke: expected })));
+          iconThemes.push({ target, base, colorScheme, fill: expected });
+          await context.close();
+        }
+      }
+    }
     for (const width of [320, 375, 768, 1440]) {
       for (const language of ['en', 'es']) {
         const context = await browser.newContext({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
@@ -199,7 +220,7 @@ try {
       }
     }
   }
-  const result = { responses, browser: browser ? 'Chromium' : 'not requested', cases: layouts };
+  const result = { responses, browser: browser ? 'Chromium' : 'not requested', iconThemes, cases: layouts };
   const output = path.resolve(process.env.UI_QA_DIR || path.join(website, '../.impeccable/review/hosting'));
   await mkdir(output, { recursive: true });
   await writeFile(path.join(output, `hosting-${browser ? 'browser' : 'http'}-report.json`), JSON.stringify(result, null, 2));
