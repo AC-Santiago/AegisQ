@@ -19,6 +19,18 @@ for (const [name, buffer] of Object.entries(generated)) {
   assert.deepEqual(await readFile(path.join(website, 'public', name)), buffer,
     `${name} is stale; run pnpm icons:build with the frozen lockfile`);
 }
+
+async function checkTransparency(image, size) {
+  const metadata = await sharp(image).metadata();
+  assert.equal(metadata.hasAlpha, true, 'Raster icons must preserve the SVG alpha channel');
+  const alpha = await sharp(image).extractChannel('alpha').raw().toBuffer();
+  for (const corner of [0, size - 1, size * (size - 1), size * size - 1]) {
+    assert.equal(alpha[corner], 0, 'Icon corners must be transparent, not paper-colored');
+  }
+  assert(alpha.filter((value) => value === 0).length > size * size / 4, 'Keep the transparent canvas and negative space');
+  assert(alpha.includes(255), 'The shield must not be blank');
+}
+
 const ico = generated['favicon.ico'];
 assert.equal(ico.readUInt16LE(0), 0);
 assert.equal(ico.readUInt16LE(2), 1);
@@ -29,7 +41,7 @@ for (const [index, size] of [16, 32, 48].entries()) {
   assert.equal(ico[entry], size);
   assert.equal(ico[entry + 1], size);
   assert.equal(ico.readUInt16LE(entry + 4), 1);
-  assert.equal(ico.readUInt16LE(entry + 6), 24);
+  assert.equal(ico.readUInt16LE(entry + 6), 32);
   assert.equal(ico.readUInt32LE(entry + 12), offset);
   const length = ico.readUInt32LE(entry + 8);
   const image = ico.subarray(offset, offset + length);
@@ -37,16 +49,14 @@ for (const [index, size] of [16, 32, 48].entries()) {
   assert.equal(metadata.format, 'png');
   assert.equal(metadata.width, size);
   assert.equal(metadata.height, size);
-  const stats = await sharp(image).stats();
-  assert(stats.channels[0].min < 100, 'The shield must not be blank');
-  assert(stats.channels[0].max > 240, 'The paper background must be present');
+  await checkTransparency(image, size);
   offset += length;
 }
 assert.equal(offset, ico.length, 'ICO offsets cover the entire file');
 const apple = await sharp(generated['apple-touch-icon.png']).metadata();
 assert.equal(apple.width, 180);
 assert.equal(apple.height, 180);
-assert.equal(apple.hasAlpha, false, 'Apple touch icon must have an opaque background');
+await checkTransparency(generated['apple-touch-icon.png'], 180);
 
 async function files(directory) {
   const result = [];
@@ -71,16 +81,20 @@ for (const target of ['home', 'docs']) {
       Object.fromEntries([...tag.matchAll(/([\w-]+)="([^"]*)"/g)].map(([, key, value]) => [key, value])));
     const icons = links.filter(({ rel }) => ['icon', 'shortcut icon', 'apple-touch-icon'].includes(rel));
     assert.deepEqual(icons.map(({ href }) => href), [
-      `${base}favicon.ico`, `${base}apple-touch-icon.png`, `${base}favicon.svg`,
+      `${base}favicon.ico?v=2`, `${base}apple-touch-icon.png?v=2`, `${base}favicon.svg`,
     ], `Icons must use the channel base, with the SVG preferred last: ${file}`);
     for (const { href } of icons) {
-      const asset = await readFile(path.join(directory, href.slice(1)));
-      const name = path.basename(href);
+      const pathname = new URL(href, 'https://docs.aegisq.dev').pathname;
+      const asset = await readFile(path.join(directory, pathname.slice(1)));
+      const name = path.basename(pathname);
       assert.deepEqual(asset, name === 'favicon.svg' ? Buffer.from(svg) : generated[name]);
     }
     assert.match(head, /name="theme-color" content="#365d51"/);
+    const mark = html.match(/<span class="aq-site-mark"[^>]*>/)?.[0];
+    assert(mark?.includes('aria-hidden="true"'), `Header mark must be decorative: ${file}`);
+    assert(mark.includes(`${base}favicon.svg`), `Header mask must use the channel base: ${file}`);
     pages++;
   }
 }
 assert(pages > 0);
-console.log(`PASS: shield SVG, reproducible ICO/Apple icons and channel-correct head links on ${pages} packaged pages (EN/ES, home/docs, stable/next, 404)`);
+console.log(`PASS: transparent ICO/Apple icons, shield SVG and channel-correct icons/header marks on ${pages} packaged pages (EN/ES, home/docs, stable/next, 404)`);

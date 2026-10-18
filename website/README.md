@@ -113,16 +113,25 @@ corepack pnpm build:cloudflare
 ```
 
 The existing locked Sharp dependency generates `public/favicon.ico` (16/32/48 px)
-and `public/apple-touch-icon.png` (180 px). Both use forest on opaque paper so
-they remain visible without SVG dark-mode support. No new dependency is needed.
+and `public/apple-touch-icon.png` (180 px). Both preserve the transparent canvas
+and negative space, with no paper background; the ICO stores 32-bit RGBA PNGs.
+Their head links include an icon revision query to refresh the previous opaque
+assets. Raster icons retain forest in any theme. iOS can still impose an opaque
+home-screen tile; transparent files do not guarantee a transparent installed
+shortcut, and an existing shortcut may need to be recreated. No new dependency is needed.
 `astro.config.mjs` declares channel-aware links and a forest browser theme color;
 Starlight's SVG favicon stays last to prefer it when supported. Packaging carries
 the icons to both domains and `/next/`. `scripts/test-icons.mjs`, included in
 `build:cloudflare`, checks regeneration, ICO payloads and links on every packaged
 HTML page, including EN/ES errors. Hosting checks request every icon over local
 HTTP; with `HOSTING_BROWSER=1`, Chromium also checks both SVG paths' fill and
-stroke in light/dark on both domains and channels. Builds only validate:
-publication still requires independent approval. The header wordmark and public
+stroke in light/dark on both domains and channels. The header places a decorative
+shield before AegisQ, using the same SVG as an alpha mask tinted with the page's
+accent color. It follows Starlight's selected theme, independently of the OS, and
+keeps the existing accessible link text and localized documentation label.
+Browser checks verify its placement, theme color and rendered mask pixels so an
+invisible mark or solid square fails the regression checks.
+Builds only validate: publication still requires independent approval. Public
 routes are unchanged.
 
 ### Layout and browser checks
@@ -149,7 +158,7 @@ styled in `src/styles/landing.css`; shared motion lives in `docs.css`. The docum
 sidebar and chapter band remain unchanged on reference pages. No client-side
 animation library or new dependency is required.
 
-The masthead shows only AegisQ on the homes. The optional Documentation /
+The masthead shows the shield and AegisQ on the homes. The optional Documentation /
 Documentación sub-label is rendered on documentation routes, not on splash
 pages. The home Hero override matches the actual home pathname. A shared
 `NotFoundHero.astro` renders the bilingual custom error pages from
